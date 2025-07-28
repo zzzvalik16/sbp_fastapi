@@ -2,8 +2,10 @@
 Сервис для работы с платежами
 """
 
-import uuid
-from datetime import datetime
+import hashlib
+import random
+import time
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -24,6 +26,9 @@ from app.services.sberbank_service import SberbankService
 from app.services.atol_service import AtolService
 
 logger = structlog.get_logger(__name__)
+
+# Установка часового пояса UTC+3
+MOSCOW_TZ = timezone(timedelta(hours=3))
 
 
 class PaymentService:
@@ -64,20 +69,29 @@ class PaymentService:
         """
         try:
             # Генерация уникального идентификатора запроса
-            #rq_uid = self._generate_rq_uid()
+            rq_uid = self._generate_rq_uid()
+            
+            # Создание записи в базе данных
             payment_data = {
-                "uid": request.uid,                
-                "order_sum": float(request.amount),                
+                "uid": request.uid or 0,
                 "account": request.account,
-                "fiscal_email": str(request.email)
+                "rq_uid": rq_uid,
+                "order_sum": float(request.amount),
+                "order_create_date": datetime.now(MOSCOW_TZ),
+                "order_state": PaymentState.CREATED,
+                "source_payments": request.payment_stat,
+                "fiscal_email": str(request.email),
+                "rq_tm": datetime.now(MOSCOW_TZ)
             }
+            
             if request.phone:
                 payment_data["fiscal_phone"] = request.phone
-            orderNumber = await self._create_payment_log(payment_data)
+            
+            payment = await self._create_payment_log(payment_data)
             
             # Создание QR кода через API Сбербанка
             sberbank_response = await self.sberbank_service.create_qr_code(
-                order_number=orderNumber,
+                order_number=str(payment.sbp_id),  # Используем sbp_id как orderNumber
                 amount=int(request.amount * 100),  # Конвертация в копейки
                 description=f"Пополнение лицевого счета №{request.account}",
                 email=str(request.email)
@@ -85,54 +99,53 @@ class PaymentService:
             
             # Извлечение sbpPayload из ответа
             sbp_payload = sberbank_response.get("externalParams", {}).get("sbpPayload")
-            qrcId = sberbank_response.get("externalParams", {}).get("qrcId")
             if not sbp_payload:
                 raise PaymentException("SBP payload not received from Sberbank")
             
-            # Сохранение платежа в базе данных
-            payment_data = {
-                "rq_uid": qrcId,
-                "order_state": PaymentState.CREATED,
-                "order_form_url": sbp_payload,
-                "source_payments": request.payment_stat               
+            # Обновление записи с данными от банка
+            update_data = {
+                "order_form_url": sbp_payload
             }
             
-            # Добавление опциональных полей
-            if request.uid:
-                payment_data["uid"] = request.uid
             if sberbank_response.get("orderId"):
-                payment_data["order_id"] = sberbank_response["orderId"]
-           
+                update_data["order_id"] = sberbank_response["orderId"]
             
-            await self._create_payment_log(payment_data)
+            if sberbank_response.get("errorCode") != "0":
+                update_data["error_code"] = sberbank_response.get("errorCode")
+                update_data["error_description"] = sberbank_response.get("errorMessage")
+                update_data["order_state"] = PaymentState.DECLINED
+            
+            await self._update_payment_by_id(payment.sbp_id, update_data)
             
             logger.info(
                 "Payment created successfully",
-                rq_uid=qrcId,
+                sbp_id=payment.sbp_id,
+                rq_uid=rq_uid,
                 order_id=sberbank_response.get("orderId"),
                 amount=request.amount
             )
             
             return PaymentCreateResponse(
                 success=True,
-                rq_uid=qrcId,
+                sbp_id=payment.sbp_id,
+                rq_uid=rq_uid,
                 order_id=sberbank_response.get("orderId"),
                 qr_payload=sbp_payload,
                 qr_url=sberbank_response.get("formUrl"),
                 amount=request.amount,
-                status=PaymentState.CREATED
+                status=PaymentState.CREATED if sberbank_response.get("errorCode") == "0" else PaymentState.DECLINED
             )
             
         except Exception as e:
             logger.error("Failed to create payment", error=str(e))
             raise PaymentException(f"Failed to create payment: {str(e)}")
     
-    async def get_payment_status(self, rq_uid: str) -> PaymentStatusResponse:
+    async def get_payment_status(self, order_id: str) -> PaymentStatusResponse:
         """
         Получение статуса платежа
         
         Args:
-            rq_uid: Уникальный идентификатор запроса
+            order_id: ID заказа в Сбербанке
             
         Returns:
             PaymentStatusResponse: Статус платежа
@@ -142,43 +155,47 @@ class PaymentService:
         """
         try:
             # Поиск платежа в базе данных
-            payment = await self._get_payment_by_rq_uid(rq_uid)
+            payment = await self._get_payment_by_order_id(order_id)
             if not payment:
                 raise PaymentException("Payment not found")
             
             # Получение актуального статуса из API Сбербанка
-            if payment.order_id:
-                try:
-                    sberbank_status = await self.sberbank_service.get_payment_status(
-                        payment.order_id
+            try:
+                sberbank_status = await self.sberbank_service.get_payment_status(order_id)
+                
+                if sberbank_status.get("errorCode") == "0":
+                    new_status = self._map_sberbank_status(
+                        sberbank_status.get("orderStatus", 0)
                     )
                     
-                    if sberbank_status.get("errorCode") == "0":
-                        new_status = self._map_sberbank_status(
-                            sberbank_status.get("orderStatus", 0)
-                        )
+                    # Обновление статуса в базе, если он изменился
+                    if payment.order_state != new_status:
+                        update_data = {
+                            "order_state": new_status
+                        }
                         
-                        # Обновление статуса в базе, если он изменился
-                        if payment.order_state != new_status:
-                            await self._update_payment_status(
-                                rq_uid, new_status,
-                                operation_date_time=sberbank_status.get("depositedDate")
+                        if sberbank_status.get("depositedDate"):
+                            update_data["operation_date_time"] = datetime.fromtimestamp(
+                                sberbank_status["depositedDate"] / 1000, tz=MOSCOW_TZ
                             )
-                            payment.order_state = new_status
+                        
+                        await self._update_payment_by_id(payment.sbp_id, update_data)
+                        payment.order_state = new_status
+                        
+                        # Обработка статуса PAID (orderStatus = 2)
+                        if new_status == PaymentState.PAID:
+                            await self._process_paid_payment(payment)
                             
-                            # Обработка статуса PAID (orderStatus = 2)
-                            if new_status == PaymentState.PAID:
-                                await self._process_paid_payment(payment)
-                                
-                except Exception as e:
-                    logger.warning(
-                        "Failed to get status from Sberbank API",
-                        rq_uid=rq_uid,
-                        error=str(e)
-                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to get status from Sberbank API",
+                    order_id=order_id,
+                    error=str(e)
+                )
             
             return PaymentStatusResponse(
                 success=True,
+                sbp_id=payment.sbp_id,
                 rq_uid=payment.rq_uid,
                 order_id=payment.order_id,
                 status=payment.order_state,
@@ -191,15 +208,15 @@ class PaymentService:
         except PaymentException:
             raise
         except Exception as e:
-            logger.error("Failed to get payment status", rq_uid=rq_uid, error=str(e))
+            logger.error("Failed to get payment status", order_id=order_id, error=str(e))
             raise PaymentException(f"Failed to get payment status: {str(e)}")
     
-    async def cancel_payment(self, rq_uid: str) -> PaymentCancelResponse:
+    async def cancel_payment(self, order_id: str) -> PaymentCancelResponse:
         """
         Отмена платежа
         
         Args:
-            rq_uid: Уникальный идентификатор запроса
+            order_id: ID заказа в Сбербанке
             
         Returns:
             PaymentCancelResponse: Результат отмены платежа
@@ -208,33 +225,37 @@ class PaymentService:
             PaymentException: При ошибке отмены платежа
         """
         try:
-            payment = await self._get_payment_by_rq_uid(rq_uid)
+            payment = await self._get_payment_by_order_id(order_id)
             if not payment:
                 raise PaymentException("Payment not found")
             
-            if not payment.order_id:
-                raise PaymentException("Order ID not found")
-            
             # Отмена платежа через API Сбербанка
-            cancel_result = await self.sberbank_service.cancel_payment(payment.order_id)
+            cancel_result = await self.sberbank_service.cancel_payment(order_id)
             
             if cancel_result.get("errorCode") != "0":
                 error_msg = cancel_result.get("errorMessage", "Unknown error")
-                await self._update_payment_status(
-                    rq_uid, PaymentState.DECLINED,
-                    error_code=cancel_result.get("errorCode"),
-                    error_description=error_msg
+                await self._update_payment_by_id(
+                    payment.sbp_id,
+                    {
+                        "order_state": PaymentState.DECLINED,
+                        "error_code": cancel_result.get("errorCode"),
+                        "error_description": error_msg
+                    }
                 )
                 raise PaymentException(f"Failed to cancel payment: {error_msg}")
             
             # Обновление статуса в базе
-            await self._update_payment_status(rq_uid, PaymentState.DECLINED)
+            await self._update_payment_by_id(
+                payment.sbp_id,
+                {"order_state": PaymentState.DECLINED}
+            )
             
-            logger.info("Payment cancelled successfully", rq_uid=rq_uid)
+            logger.info("Payment cancelled successfully", order_id=order_id)
             
             return PaymentCancelResponse(
                 success=True,
-                rq_uid=rq_uid,
+                sbp_id=payment.sbp_id,
+                order_id=order_id,
                 status=PaymentState.DECLINED,
                 message="Payment cancelled successfully"
             )
@@ -242,17 +263,17 @@ class PaymentService:
         except PaymentException:
             raise
         except Exception as e:
-            logger.error("Failed to cancel payment", rq_uid=rq_uid, error=str(e))
+            logger.error("Failed to cancel payment", order_id=order_id, error=str(e))
             raise PaymentException(f"Failed to cancel payment: {str(e)}")
     
     async def refund_payment(
-        self, rq_uid: str, amount: Optional[Decimal] = None
+        self, order_id: str, amount: Optional[Decimal] = None
     ) -> PaymentRefundResponse:
         """
         Возврат платежа
         
         Args:
-            rq_uid: Уникальный идентификатор запроса
+            order_id: ID заказа в Сбербанке
             amount: Сумма возврата (если не указана, возвращается полная сумма)
             
         Returns:
@@ -262,12 +283,9 @@ class PaymentService:
             PaymentException: При ошибке возврата платежа
         """
         try:
-            payment = await self._get_payment_by_rq_uid(rq_uid)
+            payment = await self._get_payment_by_order_id(order_id)
             if not payment:
                 raise PaymentException("Payment not found")
-            
-            if not payment.order_id:
-                raise PaymentException("Order ID not found")
             
             if payment.order_state != PaymentState.PAID:
                 raise PaymentException("Payment is not in PAID status")
@@ -276,30 +294,37 @@ class PaymentService:
             
             # Возврат платежа через API Сбербанка
             refund_result = await self.sberbank_service.refund_payment(
-                payment.order_id, refund_amount_kopecks
+                order_id, refund_amount_kopecks
             )
             
             if refund_result.get("errorCode") != "0":
                 error_msg = refund_result.get("errorMessage", "Unknown error")
-                await self._update_payment_status(
-                    rq_uid, PaymentState.DECLINED,
-                    error_code=refund_result.get("errorCode"),
-                    error_description=error_msg
+                await self._update_payment_by_id(
+                    payment.sbp_id,
+                    {
+                        "order_state": PaymentState.DECLINED,
+                        "error_code": refund_result.get("errorCode"),
+                        "error_description": error_msg
+                    }
                 )
                 raise PaymentException(f"Failed to refund payment: {error_msg}")
             
             # Обновление статуса в базе
-            await self._update_payment_status(rq_uid, PaymentState.REFUNDED)
+            await self._update_payment_by_id(
+                payment.sbp_id,
+                {"order_state": PaymentState.REFUNDED}
+            )
             
             logger.info(
                 "Payment refunded successfully",
-                rq_uid=rq_uid,
+                order_id=order_id,
                 refund_amount=refund_amount_kopecks / 100
             )
             
             return PaymentRefundResponse(
                 success=True,
-                rq_uid=rq_uid,
+                sbp_id=payment.sbp_id,
+                order_id=order_id,
                 status=PaymentState.REFUNDED,
                 refund_amount=Decimal(refund_amount_kopecks) / 100,
                 message="Payment refunded successfully"
@@ -308,26 +333,26 @@ class PaymentService:
         except PaymentException:
             raise
         except Exception as e:
-            logger.error("Failed to refund payment", rq_uid=rq_uid, error=str(e))
+            logger.error("Failed to refund payment", order_id=order_id, error=str(e))
             raise PaymentException(f"Failed to refund payment: {str(e)}")
     
-    async def process_webhook_payment(
-        self, order_id: str, status: int, order_status: Optional[int] = None,
+    async def process_callback_payment(
+        self, md_order: str, order_number: str, operation: str, status: int,
         additional_params: Optional[dict] = None
     ) -> None:
         """
-        Обработка webhook уведомления о платеже
+        Обработка callback уведомления о платеже
         
         Args:
             md_order: UUID заказа в Платёжном шлюзе
-            order_number: Номер заказа в системе Партнера
+            order_number: Номер заказа в системе Партнера (sbp_id)
             operation: Тип операции
             status: Статус операции callback (0 - неуспешно, 1 - успешно)
             additional_params: Дополнительные параметры
         """
         try:
             logger.info(
-                "Processing webhook payment",
+                "Processing callback payment",
                 md_order=md_order,
                 order_number=order_number,
                 operation=operation,
@@ -335,14 +360,19 @@ class PaymentService:
                 additional_params=additional_params
             )
             
-            # Ищем платеж по order_id (mdOrder) или по rq_uid (orderNumber)
+            # Ищем платеж по order_id (mdOrder) или по sbp_id (orderNumber)
             payment = await self._get_payment_by_order_id(md_order)
             if not payment:
-                # Пробуем найти по orderNumber (rq_uid)
-                payment = await self._get_payment_by_rq_uid(order_number)
+                # Пробуем найти по orderNumber (sbp_id)
+                try:
+                    sbp_id = int(order_number)
+                    payment = await self._get_payment_by_id(sbp_id)
+                except ValueError:
+                    pass
+                
                 if not payment:
                     logger.warning(
-                        "Payment not found for webhook",
+                        "Payment not found for callback",
                         md_order=md_order,
                         order_number=order_number
                     )
@@ -359,10 +389,12 @@ class PaymentService:
                 )
                 
                 # Обновляем статус на DECLINED при неуспешном callback
-                await self._update_payment_status(
-                    payment.rq_uid,
-                    PaymentState.DECLINED,
-                    error_description=f"Callback failed with status {status}"
+                await self._update_payment_by_id(
+                    payment.sbp_id,
+                    {
+                        "order_state": PaymentState.DECLINED,
+                        "error_description": f"Callback failed with status {status}"
+                    }
                 )
                 return
             
@@ -373,59 +405,53 @@ class PaymentService:
                 "Mapped payment status from operation",
                 md_order=md_order,
                 order_number=order_number,
-                rq_uid=payment.rq_uid,
+                sbp_id=payment.sbp_id,
                 old_status=payment.order_state,
                 new_status=new_status,
                 operation=operation
             )
             
             # Обновление статуса в базе
-            await self._update_payment_status(
-                payment.rq_uid,
-                new_status
+            await self._update_payment_by_id(
+                payment.sbp_id,
+                {
+                    "order_state": new_status,
+                    "operation_date_time": datetime.now(MOSCOW_TZ)
+                }
             )
             
             # Обработка операции "deposited" (завершение платежа)
             if operation == "deposited" and new_status == PaymentState.PAID:
-                logger.warning(
-                    "Processing PAID status from webhook",
+                logger.info(
+                    "Processing PAID status from callback",
                     md_order=md_order,
                     order_number=order_number,
-                    rq_uid=payment.rq_uid,
+                    sbp_id=payment.sbp_id,
                     operation=operation
                 )
                 
                 # Обновляем данные платежа для актуальной информации
-                updated_payment = await self._get_payment_by_rq_uid(payment.rq_uid)
+                updated_payment = await self._get_payment_by_id(payment.sbp_id)
                 if updated_payment:
                     await self._process_paid_payment(updated_payment)
                 else:
                     logger.error(
                         "Failed to get updated payment data",
-                        rq_uid=payment.rq_uid
+                        sbp_id=payment.sbp_id
                     )
-            else:
-                logger.info(
-                    "Payment status updated, no additional processing needed",
-                    md_order=md_order,
-                    order_number=order_number,
-                    rq_uid=payment.rq_uid,
-                    status=new_status,
-                    operation=operation
-                )
             
             logger.info(
-                "Webhook payment processed",
+                "Callback payment processed",
                 md_order=md_order,
                 order_number=order_number,
-                rq_uid=payment.rq_uid,
+                sbp_id=payment.sbp_id,
                 callback_status=status,
                 operation=operation
             )
             
         except Exception as e:
             logger.error(
-                "Failed to process webhook payment",
+                "Failed to process callback payment",
                 md_order=md_order,
                 order_number=order_number,
                 operation=operation,
@@ -449,18 +475,18 @@ class PaymentService:
         await self.db.refresh(payment)
         return payment
     
-    async def _get_payment_by_rq_uid(self, rq_uid: str) -> Optional[PaymentLog]:
+    async def _get_payment_by_id(self, sbp_id: int) -> Optional[PaymentLog]:
         """
-        Поиск платежа по rq_uid
+        Поиск платежа по sbp_id
         
         Args:
-            rq_uid: Уникальный идентификатор запроса
+            sbp_id: ID записи в таблице PAY_SBP_LOG
             
         Returns:
             Optional[PaymentLog]: Найденный платеж или None
         """
         result = await self.db.execute(
-            select(PaymentLog).where(PaymentLog.rq_uid == rq_uid)
+            select(PaymentLog).where(PaymentLog.sbp_id == sbp_id)
         )
         return result.scalar_one_or_none()
     
@@ -479,39 +505,23 @@ class PaymentService:
         )
         return result.scalar_one_or_none()
     
-    async def _update_payment_status(
+    async def _update_payment_by_id(
         self,
-        rq_uid: str,
-        status: PaymentState,
-        error_code: Optional[str] = None,
-        error_description: Optional[str] = None,
-        operation_date_time: Optional[int] = None
+        sbp_id: int,
+        update_data: dict
     ) -> None:
         """
-        Обновление статуса платежа
+        Обновление платежа по ID
         
         Args:
-            rq_uid: Уникальный идентификатор запроса
-            status: Новый статус
-            error_code: Код ошибки
-            error_description: Описание ошибки
-            operation_date_time: Время операции (timestamp в миллисекундах)
+            sbp_id: ID записи в таблице PAY_SBP_LOG
+            update_data: Данные для обновления
         """
-        payment = await self._get_payment_by_rq_uid(rq_uid)
+        payment = await self._get_payment_by_id(sbp_id)
         if payment:
-            payment.order_state = status
-            
-            # Установка времени операции
-            if operation_date_time:
-                # Конвертация timestamp из миллисекунд в datetime
-                payment.operation_date_time = datetime.fromtimestamp(operation_date_time / 1000)
-            else:
-                payment.operation_date_time = datetime.now()
-                
-            if error_code:
-                payment.error_code = error_code
-            if error_description:
-                payment.error_description = error_description
+            for key, value in update_data.items():
+                if hasattr(payment, key):
+                    setattr(payment, key, value)
             await self.db.commit()
     
     async def _process_paid_payment(self, payment: PaymentLog) -> None:
@@ -525,6 +535,7 @@ class PaymentService:
         try:
             logger.info(
                 "Processing PAID payment",
+                sbp_id=payment.sbp_id,
                 rq_uid=payment.rq_uid,
                 order_id=payment.order_id,
                 amount=payment.order_sum
@@ -554,7 +565,7 @@ class PaymentService:
             
             logger.info(
                 "Payment inserted into FEE table",
-                rq_uid=payment.rq_uid,
+                sbp_id=payment.sbp_id,
                 fid=fid
             )
             
@@ -568,12 +579,12 @@ class PaymentService:
                     email=payment.fiscal_email,
                     phone=payment.fiscal_phone
                 )
-                logger.info("Fiscal receipt sent successfully", rq_uid=payment.rq_uid, fid=fid)
+                logger.info("Fiscal receipt sent successfully", sbp_id=payment.sbp_id, fid=fid)
                 
         except Exception as e:
             logger.error(
                 "Failed to process paid payment",
-                rq_uid=payment.rq_uid,
+                sbp_id=payment.sbp_id,
                 error=str(e)
             )
     
@@ -614,7 +625,7 @@ class PaymentService:
         """
         # Определение даты платежа согласно логике из требований
         date_pay = payment.operation_date_time if payment.operation_date_time else (
-            payment.rq_tm if payment.rq_tm else datetime.now()
+            payment.rq_tm if payment.rq_tm else datetime.now(MOSCOW_TZ)
         )
         sum_paid = Decimal(str(payment.order_sum))
         uid = payment.uid
@@ -648,12 +659,23 @@ class PaymentService:
     
     def _generate_rq_uid(self) -> str:
         """
-        Генерация уникального идентификатора запроса
+        Генерация уникального идентификатора запроса аналогично PHP коду:
+        str_pad(md5(date('c')), 32, (string)rand())
         
         Returns:
             str: Уникальный идентификатор
         """
-        return f"RQ_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}"
+        # Получаем текущую дату в формате ISO 8601 (аналог date('c') в PHP)
+        current_date = datetime.now(MOSCOW_TZ).isoformat()
+        
+        # Создаем MD5 хеш от даты
+        md5_hash = hashlib.md5(current_date.encode()).hexdigest()
+        
+        # Дополняем до 32 символов случайными цифрами (аналог str_pad с rand())
+        while len(md5_hash) < 32:
+            md5_hash += str(random.randint(0, 9))
+        
+        return md5_hash[:32]
     
     def _map_sberbank_status(self, status: int) -> PaymentState:
         """

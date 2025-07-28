@@ -82,6 +82,9 @@ class SberbankService:
             
             result = response.json()
             
+            # Фильтрация null значений из ответа
+            result = self._filter_null_values(result)
+            
             logger.info(
                 "QR code created successfully",
                 order_number=order_number,
@@ -141,6 +144,9 @@ class SberbankService:
             
             result = response.json()
             
+            # Фильтрация null значений из ответа
+            result = self._filter_null_values(result)
+            
             logger.info(
                 "Payment status retrieved",
                 order_id=order_id,
@@ -193,6 +199,9 @@ class SberbankService:
             response.raise_for_status()
             
             result = response.json()
+            
+            # Фильтрация null значений из ответа
+            result = self._filter_null_values(result)
             
             logger.info(
                 "Payment cancelled",
@@ -253,6 +262,9 @@ class SberbankService:
             
             result = response.json()
             
+            # Фильтрация null значений из ответа
+            result = self._filter_null_values(result)
+            
             logger.info(
                 "Payment refunded",
                 order_id=order_id,
@@ -276,6 +288,27 @@ class SberbankService:
                 error=str(e)
             )
             raise SberbankAPIException(f"Unexpected error: {str(e)}")
+    
+    def _filter_null_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Фильтрация null значений из словаря
+        
+        Args:
+            data: Исходный словарь
+            
+        Returns:
+            Dict[str, Any]: Словарь без null значений
+        """
+        if isinstance(data, dict):
+            return {
+                key: self._filter_null_values(value) 
+                for key, value in data.items() 
+                if value is not None
+            }
+        elif isinstance(data, list):
+            return [self._filter_null_values(item) for item in data if item is not None]
+        else:
+            return data
     
     async def __aenter__(self):
         """Async context manager entry"""

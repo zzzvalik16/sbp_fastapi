@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     SBERBANK_USERNAME: str = Field(..., description="Логин Сбербанк API")
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
     SBERBANK_RETURN_URL: str = Field(
-        default="https://sbp-api.starlink.ru/api/v1/webhook/payment",
+        default="https://sbp-api.starlink.ru/api/v1/callback/payment",
         description="URL для получения статуса от банка"
     )
     
@@ -57,8 +57,8 @@ class Settings(BaseSettings):
         description="URL АТОЛ API"
     )
     
-    # Webhook
-    WEBHOOK_SECRET: str = Field(default="", description="Секрет для webhook")
+    # Callback
+    CALLBACK_SECRET: str = Field(default="", description="Секрет для callback")
     
     @property
     def database_url(self) -> str:

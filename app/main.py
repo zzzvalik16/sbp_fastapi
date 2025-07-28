@@ -55,8 +55,8 @@ def create_app() -> FastAPI:
         title="СБП API",
         description="API для работы с Системой Быстрых Платежей через Сбербанк",
         version="1.0.0",
-        docs_url="/docs" if settings.DEBUG else None,
-        redoc_url="/redoc" if settings.DEBUG else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan
     )
     

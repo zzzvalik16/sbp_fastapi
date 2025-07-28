@@ -3,6 +3,7 @@
 """
 
 import logging
+import os
 import sys
 from typing import Any, Dict
 
@@ -16,10 +17,26 @@ def setup_logging(log_level: str = "INFO") -> None:
     Args:
         log_level: Уровень логирования
     """
+    # Создание директории для логов
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # Настройка файлового логирования
+    file_handler = logging.FileHandler(
+        os.path.join(log_dir, "app.log"),
+        encoding="utf-8"
+    )
+    file_handler.setLevel(getattr(logging, log_level.upper()))
+    
+    # Настройка консольного логирования
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(getattr(logging, log_level.upper()))
+    
     # Настройка стандартного логирования
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        handlers=[console_handler, file_handler],
         level=getattr(logging, log_level.upper()),
     )
     

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 from app.models.payment import PaymentState
 
@@ -38,23 +38,25 @@ class PaymentCreateRequest(BaseModel):
         description="Статистика платежа"
     )
     uid: Optional[int] = Field(
-        None,
+        default=None,
         description="Идентификатор пользователя"
     )
     phone: Optional[str] = Field(
-        None,
+        default=None,
         max_length=12,
         description="Телефон плательщика"
     )
     
-    @validator('amount')
+    @field_validator('amount')
+    @classmethod
     def validate_amount(cls, v):
         """Валидация суммы платежа"""
         if v <= 0:
             raise ValueError('Сумма должна быть больше 0')
         return v
     
-    @validator('account')
+    @field_validator('account')
+    @classmethod
     def validate_account(cls, v):
         """Валидация номера счета"""
         if not v.isdigit():
@@ -68,10 +70,11 @@ class PaymentCreateResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
-    order_id: Optional[str] = Field(None, description="ID заказа в Сбербанке")
+    order_id: Optional[str] = Field(default=None, description="ID заказа в Сбербанке")
     qr_payload: str = Field(..., description="Платежная ссылка для QR кода")
-    qr_url: Optional[str] = Field(None, description="URL формы оплаты")
+    qr_url: Optional[str] = Field(default=None, description="URL формы оплаты")
     amount: Decimal = Field(..., description="Сумма платежа")
     status: PaymentState = Field(..., description="Статус платежа")
 
@@ -82,13 +85,14 @@ class PaymentStatusResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
-    order_id: Optional[str] = Field(None, description="ID заказа в Сбербанке")
+    order_id: Optional[str] = Field(default=None, description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Статус платежа")
-    amount: Optional[Decimal] = Field(None, description="Сумма платежа")
-    account: Optional[str] = Field(None, description="Номер лицевого счета")
-    created_at: Optional[datetime] = Field(None, description="Дата создания")
-    operation_time: Optional[datetime] = Field(None, description="Время операции")
+    amount: Optional[Decimal] = Field(default=None, description="Сумма платежа")
+    account: Optional[str] = Field(default=None, description="Номер лицевого счета")
+    created_at: Optional[datetime] = Field(default=None, description="Дата создания")
+    operation_time: Optional[datetime] = Field(default=None, description="Время операции")
 
 
 class PaymentCancelResponse(BaseModel):
@@ -97,7 +101,8 @@ class PaymentCancelResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    order_id: str = Field(..., description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Новый статус платежа")
     message: str = Field(..., description="Сообщение об операции")
 
@@ -108,7 +113,7 @@ class PaymentRefundRequest(BaseModel):
     """
     
     amount: Optional[Decimal] = Field(
-        None,
+        default=None,
         gt=0,
         description="Сумма возврата (если не указана, возвращается полная сумма)"
     )
@@ -120,15 +125,16 @@ class PaymentRefundResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    order_id: str = Field(..., description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Новый статус платежа")
     refund_amount: Decimal = Field(..., description="Сумма возврата")
     message: str = Field(..., description="Сообщение об операции")
 
 
-class WebhookPaymentData(BaseModel):
+class CallbackPaymentData(BaseModel):
     """
-    Схема данных webhook уведомления о платеже
+    Схема данных callback уведомления о платеже
     """
     
     mdOrder: str = Field(

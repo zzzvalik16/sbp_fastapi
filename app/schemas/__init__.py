@@ -9,7 +9,7 @@ from app.schemas.payment import (
     PaymentCancelResponse,
     PaymentRefundRequest,
     PaymentRefundResponse,
-    WebhookPaymentData
+    CallbackPaymentData
 )
 
 __all__ = [
@@ -19,5 +19,5 @@ __all__ = [
     "PaymentCancelResponse",
     "PaymentRefundRequest",
     "PaymentRefundResponse",
-    "WebhookPaymentData"
+    "CallbackPaymentData"
 ]

@@ -55,20 +55,20 @@ async def create_payment(
 
 
 @router.get(
-    "/{rq_uid}/status",
+    "/{order_id}/status",
     response_model=PaymentStatusResponse,
     summary="Получение статуса платежа",
-    description="Получение текущего статуса платежа по уникальному идентификатору"
+    description="Получение текущего статуса платежа по ID заказа в Сбербанке"
 )
 async def get_payment_status(
-    rq_uid: str,
+    order_id: str,
     payment_service: Annotated[PaymentService, Depends(get_payment_service)]
 ) -> PaymentStatusResponse:
     """
     Получение статуса платежа
     
     Args:
-        rq_uid: Уникальный идентификатор запроса
+        order_id: ID заказа в Сбербанке
         payment_service: Сервис для работы с платежами
         
     Returns:
@@ -78,7 +78,7 @@ async def get_payment_status(
         HTTPException: При ошибке получения статуса
     """
     try:
-        return await payment_service.get_payment_status(rq_uid)
+        return await payment_service.get_payment_status(order_id)
     except PaymentException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -87,20 +87,20 @@ async def get_payment_status(
 
 
 @router.post(
-    "/{rq_uid}/cancel",
+    "/{order_id}/cancel",
     response_model=PaymentCancelResponse,
     summary="Отмена платежа",
     description="Отмена платежа в системе НСПК"
 )
 async def cancel_payment(
-    rq_uid: str,
+    order_id: str,
     payment_service: Annotated[PaymentService, Depends(get_payment_service)]
 ) -> PaymentCancelResponse:
     """
     Отмена платежа
     
     Args:
-        rq_uid: Уникальный идентификатор запроса
+        order_id: ID заказа в Сбербанке
         payment_service: Сервис для работы с платежами
         
     Returns:
@@ -110,7 +110,7 @@ async def cancel_payment(
         HTTPException: При ошибке отмены платежа
     """
     try:
-        return await payment_service.cancel_payment(rq_uid)
+        return await payment_service.cancel_payment(order_id)
     except PaymentException as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,13 +119,13 @@ async def cancel_payment(
 
 
 @router.post(
-    "/{rq_uid}/refund",
+    "/{order_id}/refund",
     response_model=PaymentRefundResponse,
     summary="Возврат платежа",
     description="Возврат платежа полностью или частично"
 )
 async def refund_payment(
-    rq_uid: str,
+    order_id: str,
     request: PaymentRefundRequest,
     payment_service: Annotated[PaymentService, Depends(get_payment_service)]
 ) -> PaymentRefundResponse:
@@ -133,7 +133,7 @@ async def refund_payment(
     Возврат платежа
     
     Args:
-        rq_uid: Уникальный идентификатор запроса
+        order_id: ID заказа в Сбербанке
         request: Данные для возврата
         payment_service: Сервис для работы с платежами
         
@@ -144,7 +144,7 @@ async def refund_payment(
         HTTPException: При ошибке возврата платежа
     """
     try:
-        return await payment_service.refund_payment(rq_uid, request.amount)
+        return await payment_service.refund_payment(order_id, request.amount)
     except PaymentException as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import payment, webhook
+from app.api.v1.endpoints import payment, callback
 
 api_v1_router = APIRouter()
 
@@ -16,9 +16,9 @@ api_v1_router.include_router(
 )
 
 api_v1_router.include_router(
-    webhook.router,
-    prefix="/webhook",
-    tags=["webhooks"]
+    callback.router,
+    prefix="/callback",
+    tags=["callbacks"]
 )
 
 @api_v1_router.get("/info")
