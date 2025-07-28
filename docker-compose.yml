@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sbp-fastapi
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+    environment:
+      - DEBUG=true
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=sbp_user
+      - DB_PASSWORD=sbp_password
+      - DB_NAME=sbp_api
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+    networks:
+      - sbp-network
+
+  mysql:
+    image: mysql:5.7
+    container_name: sbp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 
+      MYSQL_DATABASE: sbp_api
+      MYSQL_USER: sbp_user
+      MYSQL_PASSWORD: sbp_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sbp-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: sbp-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: 
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - sbp-network
+
+volumes:
+  mysql_data:
+
+networks:
+  sbp-network:
+    driver: bridge
