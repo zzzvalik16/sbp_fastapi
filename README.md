@@ -65,7 +65,7 @@ app/
 
 ## Быстрый старт
 
-### 1. Установка через Docker
+### 1. Установка через Docker (рекомендуется)
 
 ```bash
 # Клонирование репозитория
@@ -76,7 +76,38 @@ cd fastapi-sbp-api
 make install
 ```
 
-### 2. Настройка окружения
+### 2. Локальная установка (без Docker)
+
+```bash
+# Клонирование репозитория
+git clone <repository-url>
+cd fastapi-sbp-api
+
+# Создание виртуального окружения
+python -m venv venv
+
+# Активация виртуального окружения
+# На Windows:
+venv\Scripts\activate
+# На Linux/macOS:
+source venv/bin/activate
+
+# Установка зависимостей
+pip install -r requirements.txt
+
+# Настройка переменных окружения
+cp .env.example .env
+# Отредактируйте .env файл с вашими настройками
+
+# Установка и настройка MySQL
+# Создайте базу данных sbp_api
+# Создайте пользователя sbp_user с паролем sbp_password
+
+# Запуск приложения
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. Настройка окружения
 
 Скопируйте `.env.example` в `.env` и настройте переменные:
 
@@ -101,7 +132,7 @@ ATOL_LOGIN=your_atol_login
 ATOL_PASSWORD=your_atol_password
 ```
 
-### 3. Запуск сервисов
+### 4. Запуск сервисов (Docker)
 
 ```bash
 # Запуск всех сервисов
@@ -114,14 +145,36 @@ make logs
 make down
 ```
 
+### 5. Запуск для разработки (локально)
+
+```bash
+# Запуск в режиме разработки с автоперезагрузкой
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Или через make команду
+make dev
+```
+
 ## Доступные сервисы
 
 После запуска доступны:
 - **API**: http://localhost:8000
 - **Документация**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
-- **phpMyAdmin**: http://localhost:8080
+- **phpMyAdmin**: http://localhost:8080 (только при запуске через Docker)
 - **MySQL**: localhost:3306
+
+## Требования к системе
+
+### Для Docker установки:
+- Docker 20.10+
+- Docker Compose 2.0+
+- 2GB свободной оперативной памяти
+
+### Для локальной установки:
+- Python 3.12+
+- MySQL 5.7+ или 8.0+
+- 1GB свободной оперативной памяти
 
 ## API Endpoints
 

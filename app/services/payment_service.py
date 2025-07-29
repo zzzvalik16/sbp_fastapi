@@ -5,7 +5,7 @@
 import hashlib
 import random
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -26,9 +26,6 @@ from app.services.sberbank_service import SberbankService
 from app.services.atol_service import AtolService
 
 logger = structlog.get_logger(__name__)
-
-# Установка часового пояса UTC+3
-MOSCOW_TZ = timezone(timedelta(hours=3))
 
 
 class PaymentService:
@@ -77,11 +74,11 @@ class PaymentService:
                 "account": request.account,
                 "rq_uid": rq_uid,
                 "order_sum": float(request.amount),
-                "order_create_date": datetime.now(MOSCOW_TZ),
+                "order_create_date": datetime.now(),
                 "order_state": PaymentState.CREATED,
                 "source_payments": request.payment_stat,
                 "fiscal_email": str(request.email),
-                "rq_tm": datetime.now(MOSCOW_TZ)
+                "rq_tm": datetime.now()
             }
             
             if request.phone:
@@ -97,23 +94,68 @@ class PaymentService:
                 email=str(request.email)
             )
             
-            # Извлечение sbpPayload из ответа
-            sbp_payload = sberbank_response.get("externalParams", {}).get("sbpPayload")
-            if not sbp_payload:
-                raise PaymentException("SBP payload not received from Sberbank")
-            
             # Обновление записи с данными от банка
             update_data = {
-                "order_form_url": sbp_payload
+                "error_code": sberbank_response.get("errorCode", "0"),
+                "operation_date_time": datetime.now()
             }
             
-            if sberbank_response.get("orderId"):
-                update_data["order_id"] = sberbank_response["orderId"]
-            
+            # Проверка на ошибки от Сбербанка
             if sberbank_response.get("errorCode") != "0":
-                update_data["error_code"] = sberbank_response.get("errorCode")
                 update_data["error_description"] = sberbank_response.get("errorMessage")
                 update_data["order_state"] = PaymentState.DECLINED
+                
+                await self._update_payment_by_id(payment.sbp_id, update_data)
+                
+                logger.error(
+                    "Sberbank API error during payment creation",
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    error_code=sberbank_response.get("errorCode"),
+                    error_message=sberbank_response.get("errorMessage")
+                )
+                
+                return PaymentCreateResponse(
+                    success=False,
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    order_id=None,
+                    qr_payload="",
+                    qr_url=None,
+                    amount=request.amount,
+                    status=PaymentState.DECLINED
+                )
+            
+            # Извлечение sbpPayload из ответа при успешном создании
+            sbp_payload = sberbank_response.get("externalParams", {}).get("sbpPayload")
+            if not sbp_payload:
+                update_data["error_description"] = "SBP payload not received from Sberbank"
+                update_data["order_state"] = PaymentState.DECLINED
+                
+                await self._update_payment_by_id(payment.sbp_id, update_data)
+                
+                logger.error(
+                    "SBP payload not received from Sberbank",
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    sberbank_response=sberbank_response
+                )
+                
+                return PaymentCreateResponse(
+                    success=False,
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    order_id=sberbank_response.get("orderId"),
+                    qr_payload="",
+                    qr_url=None,
+                    amount=request.amount,
+                    status=PaymentState.DECLINED
+                )
+            
+            # Успешное создание платежа
+            update_data["order_form_url"] = sbp_payload
+            if sberbank_response.get("orderId"):
+                update_data["order_id"] = sberbank_response["orderId"]
             
             await self._update_payment_by_id(payment.sbp_id, update_data)
             
@@ -176,7 +218,7 @@ class PaymentService:
                         
                         if sberbank_status.get("depositedDate"):
                             update_data["operation_date_time"] = datetime.fromtimestamp(
-                                sberbank_status["depositedDate"] / 1000, tz=MOSCOW_TZ
+                                sberbank_status["depositedDate"] / 1000
                             )
                         
                         await self._update_payment_by_id(payment.sbp_id, update_data)
@@ -234,20 +276,34 @@ class PaymentService:
             
             if cancel_result.get("errorCode") != "0":
                 error_msg = cancel_result.get("errorMessage", "Unknown error")
+                error_code = cancel_result.get("errorCode")
+                
                 await self._update_payment_by_id(
                     payment.sbp_id,
                     {
                         "order_state": PaymentState.DECLINED,
-                        "error_code": cancel_result.get("errorCode"),
-                        "error_description": error_msg
+                        "error_code": error_code,
+                        "error_description": error_msg,
+                        "operation_date_time": datetime.now()
                     }
                 )
+                
+                logger.error(
+                    "Failed to cancel payment via Sberbank API",
+                    order_id=order_id,
+                    error_code=error_code,
+                    error_message=error_msg
+                )
+                
                 raise PaymentException(f"Failed to cancel payment: {error_msg}")
             
             # Обновление статуса в базе
             await self._update_payment_by_id(
                 payment.sbp_id,
-                {"order_state": PaymentState.DECLINED}
+                {
+                    "order_state": PaymentState.DECLINED,
+                    "operation_date_time": datetime.now()
+                }
             )
             
             logger.info("Payment cancelled successfully", order_id=order_id)
@@ -299,20 +355,34 @@ class PaymentService:
             
             if refund_result.get("errorCode") != "0":
                 error_msg = refund_result.get("errorMessage", "Unknown error")
+                error_code = refund_result.get("errorCode")
+                
                 await self._update_payment_by_id(
                     payment.sbp_id,
                     {
                         "order_state": PaymentState.DECLINED,
-                        "error_code": refund_result.get("errorCode"),
-                        "error_description": error_msg
+                        "error_code": error_code,
+                        "error_description": error_msg,
+                        "operation_date_time": datetime.now()
                     }
                 )
+                
+                logger.error(
+                    "Failed to refund payment via Sberbank API",
+                    order_id=order_id,
+                    error_code=error_code,
+                    error_message=error_msg
+                )
+                
                 raise PaymentException(f"Failed to refund payment: {error_msg}")
             
             # Обновление статуса в базе
             await self._update_payment_by_id(
                 payment.sbp_id,
-                {"order_state": PaymentState.REFUNDED}
+                {
+                    "order_state": PaymentState.REFUNDED,
+                    "operation_date_time": datetime.now()
+                }
             )
             
             logger.info(
@@ -416,7 +486,7 @@ class PaymentService:
                 payment.sbp_id,
                 {
                     "order_state": new_status,
-                    "operation_date_time": datetime.now(MOSCOW_TZ)
+                    "operation_date_time": datetime.now()
                 }
             )
             
@@ -625,7 +695,7 @@ class PaymentService:
         """
         # Определение даты платежа согласно логике из требований
         date_pay = payment.operation_date_time if payment.operation_date_time else (
-            payment.rq_tm if payment.rq_tm else datetime.now(MOSCOW_TZ)
+            payment.rq_tm if payment.rq_tm else datetime.now()
         )
         sum_paid = Decimal(str(payment.order_sum))
         uid = payment.uid
@@ -666,7 +736,7 @@ class PaymentService:
             str: Уникальный идентификатор
         """
         # Получаем текущую дату в формате ISO 8601 (аналог date('c') в PHP)
-        current_date = datetime.now(MOSCOW_TZ).isoformat()
+        current_date = datetime.now().isoformat()
         
         # Создаем MD5 хеш от даты
         md5_hash = hashlib.md5(current_date.encode()).hexdigest()
