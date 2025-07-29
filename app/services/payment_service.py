@@ -430,15 +430,26 @@ class PaymentService:
                 additional_params=additional_params
             )
             
-            # Ищем платеж по order_id (mdOrder) или по sbp_id (orderNumber)
-            payment = await self._get_payment_by_order_id(md_order)
+            # Сначала ищем платеж по order_id (mdOrder)
+            payment = None
+            if md_order:
+                payment = await self._get_payment_by_order_id(md_order)
+            
+            # Если не найден, пробуем найти по sbp_id (orderNumber)
             if not payment:
-                # Пробуем найти по orderNumber (sbp_id)
                 try:
                     sbp_id = int(order_number)
                     payment = await self._get_payment_by_id(sbp_id)
+                    logger.info(
+                        "Payment found by sbp_id",
+                        sbp_id=sbp_id,
+                        md_order=md_order
+                    )
                 except ValueError:
-                    pass
+                    logger.warning(
+                        "Invalid orderNumber format",
+                        order_number=order_number
+                    )
                 
                 if not payment:
                     logger.warning(
@@ -464,6 +475,7 @@ class PaymentService:
                     {
                         "order_state": PaymentState.DECLINED,
                         "error_description": f"Callback failed with status {status}"
+                        "operation_date_time": datetime.now()
                     }
                 )
                 return
@@ -527,6 +539,7 @@ class PaymentService:
                 operation=operation,
                 status=status,
                 error=str(e)
+                exc_info=True
             )
     
     async def _create_payment_log(self, payment_data: dict) -> PaymentLog:

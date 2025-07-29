@@ -46,10 +46,33 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         except Exception as e:
-            logger.error("Database session error", error=str(e))
+            logger.error("Database session error", error=str(e), exc_info=True)
             await session.rollback()
             raise
         finally:
+            await session.close()
+
+
+async def get_db_safe() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Безопасная версия dependency для получения сессии базы данных
+    Используется в callback endpoints где важна стабильность
+    
+    Yields:
+        AsyncSession: Сессия базы данных
+    """
+    session = None
+    try:
+        session = AsyncSessionLocal()
+        yield session
+        await session.commit()
+    except Exception as e:
+        logger.error("Database session error", error=str(e), exc_info=True)
+        if session:
+            await session.rollback()
+        raise
+    finally:
+        if session:
             await session.close()
 
 

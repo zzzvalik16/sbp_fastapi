@@ -139,29 +139,26 @@ class CallbackPaymentData(BaseModel):
     
     mdOrder: str = Field(
         ..., 
-        pattern=r"^[a-f0-9\-]+$",
-        min_length=36,
-        max_length=36,
+        min_length=1,
+        max_length=100,
         description="Уникальный номер заказа в Платёжном шлюзе (UUID)"
     )
     orderNumber: str = Field(
         ...,
-        pattern=r"^[ -~А-Яа-яЁёA-Za-z0-9-_№]*$",
         min_length=1,
-        max_length=36,
+        max_length=100,
         description="Уникальный номер заказа в системе Партнера"
     )
     operation: str = Field(
         ...,
-        pattern=r"^[A-Za-z0-9]*$",
         min_length=1,
-        max_length=20,
+        max_length=50,
         description="Тип операции"
     )
     status: int = Field(
         ..., 
         ge=0, 
-        le=1, 
+        le=10, 
         description="Статус операции callback (0 - неуспешно, 1 - успешно)"
     )
     additionalParams: Optional[dict] = Field(
