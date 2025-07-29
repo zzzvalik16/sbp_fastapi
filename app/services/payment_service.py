@@ -474,7 +474,7 @@ class PaymentService:
                     payment.sbp_id,
                     {
                         "order_state": PaymentState.DECLINED,
-                        "error_description": f"Callback failed with status {status}"
+                        "error_description": f"Callback failed with status {status}",
                         "operation_date_time": datetime.now()
                     }
                 )
@@ -538,7 +538,7 @@ class PaymentService:
                 order_number=order_number,
                 operation=operation,
                 status=status,
-                error=str(e)
+                error=str(e),
                 exc_info=True
             )
     
