@@ -54,7 +54,10 @@ class SberbankService:
             SberbankAPIException: При ошибке API Сбербанка
         """
         url = f"{self.base_url}/register.do"
-        
+        jsonDopParams={
+                "qrType": "DYNAMIC_QR_SBP",
+                "sbp.scenario": "C2B"
+            }
         data = {
             "userName": self.username,
             "password": self.password,
@@ -63,10 +66,7 @@ class SberbankService:
             "returnUrl": self.return_url,
             "description": description,
             "email": email,
-            "jsonParams": {
-                "qrType": "DYNAMIC_QR_SBP",
-                "sbp.scenario": "C2B"
-            }
+            "jsonParams": jsonDopParams
         }
         
         try:
@@ -74,7 +74,11 @@ class SberbankService:
                 "Creating QR code",
                 order_number=order_number,
                 amount=amount,
-                url=url
+                url=url,
+                jsonParams=jsonDopParams,
+                description=description,
+                email=email
+
             )
             
             response = await self.client.post(url, json=data)
@@ -83,7 +87,13 @@ class SberbankService:
             result = response.json()
             
             # Фильтрация null значений из ответа
-            result = self._filter_null_values(result)
+            result = self._filter_null_values(result)    
+            
+            if result.get("errorCode") != "0":
+                raise SberbankAPIException(
+                    f"Sberbank API error: {result.get('errorMessage', 'Unknown error')}",
+                    details=result
+                )
             
             logger.info(
                 "QR code created successfully",
@@ -91,12 +101,6 @@ class SberbankService:
                 order_id=result.get("orderId"),
                 error_code=result.get("errorCode")
             )
-            
-            if result.get("errorCode") != "0":
-                raise SberbankAPIException(
-                    f"Sberbank API error: {result.get('errorMessage', 'Unknown error')}",
-                    details=result
-                )
             
             return result
             
@@ -205,6 +209,7 @@ class SberbankService:
             
             logger.info(
                 "Payment cancelled",
+                data=data,
                 order_id=order_id,
                 error_code=result.get("errorCode")
             )

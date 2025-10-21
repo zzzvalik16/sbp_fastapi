@@ -57,7 +57,7 @@ test: ## Тестирование API
 	@echo "Тестирование создания платежа..."
 	@curl -X POST http://localhost:8000/api/v1/payment/create \
 		-H "Content-Type: application/json\" \
-		-d '{"amount":"500","email":"test@example.com","account":"054350","payment_stat":"sbpStat","uid":12345}\' \
+		-d '{"amount":"500","email":"test@example.com","account":"054350","paymentStat":"sbpStat"}\' \
 		| python -m json.tool
 
 status: ## Показать статус сервисов

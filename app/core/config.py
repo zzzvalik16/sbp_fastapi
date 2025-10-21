@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     SBERBANK_USERNAME: str = Field(..., description="Логин Сбербанк API")
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
     SBERBANK_RETURN_URL: str = Field(
-        default="https://sbp-api.starlink.ru/api/v1/callback/payment",
+        default="https://sbp-api.starlink.ru/api/v1/callback",
         description="URL для получения статуса от банка"
     )
     

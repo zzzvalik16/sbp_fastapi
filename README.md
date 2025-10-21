@@ -181,15 +181,14 @@ make dev
 ### Создание платежа
 
 ```http
-POST /api/v1/payment/create
+POST /api/v1/create
 Content-Type: application/json
 
 {
     "amount": "500.00",
     "email": "user@example.com",
     "account": "054350",
-    "payment_stat": "sbpStat",
-    "uid": 12345,
+    "paymentStat": "sbpStat",    
     "phone": "+79001234567"
 }
 ```
@@ -200,7 +199,7 @@ Content-Type: application/json
     "success": true,
     "rq_uid": "RQ_1640995200_abc12345",
     "order_id": "a67b0ced-c9a4-4cfb-bce3-b9595afaafc1",
-    "qr_payload": "https://qr.nspk.ru/AD10006MNS72CPM49QGO1NIUBH13VD8H?type=02&bank=100000000111&sum=50000&cur=RUB&crc=6CB3",
+    "qrcode_link": "https://qr.nspk.ru/AD10006MNS72CPM49QGO1NIUBH13VD8H?type=02&bank=100000000111&sum=50000&cur=RUB&crc=6CB3",
     "qr_url": "https://ecomtest.sberbank.ru/pp/pay_ru?orderId=...",
     "amount": "500.00",
     "status": "CREATED"
@@ -210,19 +209,19 @@ Content-Type: application/json
 ### Получение статуса платежа
 
 ```http
-GET /api/v1/payment/{rq_uid}/status
+GET /api/v1/status/{rq_uid}
 ```
 
 ### Отмена платежа
 
 ```http
-POST /api/v1/payment/{rq_uid}/cancel
+POST /api/v1/cancel/{rq_uid}
 ```
 
 ### Возврат платежа
 
 ```http
-POST /api/v1/payment/{rq_uid}/refund
+POST /api/v1/refund/{rq_uid}
 Content-Type: application/json
 
 {
@@ -233,7 +232,7 @@ Content-Type: application/json
 ### Webhook уведомления
 
 ```http
-POST /api/v1/webhook/payment
+POST /api/v1/callback
 Content-Type: application/json
 X-Signature: webhook_signature
 
@@ -360,7 +359,7 @@ make format        # Форматирование
 make test
 
 # Ручное тестирование через curl
-curl -X POST http://localhost:8000/api/v1/payment/create \
+curl -X POST http://localhost:8000/api/v1/create \
   -H "Content-Type: application/json" \
   -d '{"amount":"500","email":"test@example.com","account":"054350"}'
 ```

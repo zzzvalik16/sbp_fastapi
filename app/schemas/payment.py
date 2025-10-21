@@ -24,7 +24,7 @@ class PaymentCreateRequest(BaseModel):
     )
     email: EmailStr = Field(
         ...,
-        description="Email плательщика для фискализации"
+        description="Email плательщика"
     )
     account: str = Field(
         ...,
@@ -32,14 +32,10 @@ class PaymentCreateRequest(BaseModel):
         max_length=6,
         description="Номер лицевого счета"
     )
-    payment_stat: str = Field(
+    paymentStat: str = Field(
         default="sbpStat",
         max_length=10,
-        description="Статистика платежа"
-    )
-    uid: Optional[int] = Field(
-        default=None,
-        description="Идентификатор пользователя"
+        description="Источник платежа"
     )
     phone: Optional[str] = Field(
         default=None,
@@ -73,7 +69,7 @@ class PaymentCreateResponse(BaseModel):
     sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
     order_id: Optional[str] = Field(default=None, description="ID заказа в Сбербанке")
-    qr_payload: str = Field(..., description="Платежная ссылка для QR кода")
+    qrcode_link: str = Field(..., description="Платежная ссылка для QR кода")
     qr_url: Optional[str] = Field(default=None, description="URL формы оплаты")
     amount: Decimal = Field(..., description="Сумма платежа")
     status: PaymentState = Field(..., description="Статус платежа")

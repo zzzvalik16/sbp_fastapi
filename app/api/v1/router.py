@@ -11,7 +11,7 @@ api_v1_router = APIRouter()
 # Подключение роутов
 api_v1_router.include_router(
     payment.router,
-    prefix="/payment",
+    prefix="",
     tags=["payments"]
 )
 

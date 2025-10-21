@@ -25,10 +25,18 @@ def setup_logging(log_level: str = "INFO") -> None:
     # Настройка файлового логирования
     file_handler = logging.FileHandler(
         os.path.join(log_dir, "app.log"),
+        when="midnight",
+        interval=1,
+        backupCount=30,
         encoding="utf-8"
     )
     file_handler.setLevel(getattr(logging, log_level.upper()))
-    
+
+    file_formatter = logging.Formatter(
+           '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+    file_handler.setFormatter(file_formatter)
     # Настройка консольного логирования
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, log_level.upper()))
@@ -58,6 +66,7 @@ def setup_logging(log_level: str = "INFO") -> None:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
+ 
 
 
 def get_logger(name: str) -> structlog.BoundLogger:

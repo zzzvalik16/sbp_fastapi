@@ -67,16 +67,34 @@ class PaymentService:
         try:
             # Генерация уникального идентификатора запроса
             rq_uid = self._generate_rq_uid()
+            customer_uid = await self._get_customer_uid(request.account)
+            if not customer_uid:                
+                logger.error(
+                    "User not found",
+                    account=request.account,
+                    rq_uid=rq_uid
+                )
+                
+                return PaymentCreateResponse(
+                    success=False,
+                    sbp_id=2,
+                    rq_uid=rq_uid,
+                    order_id=None,
+                    qrcode_link="",
+                    qr_url=None,
+                    amount=request.amount,
+                    status=PaymentState.DECLINED
+                )
             
             # Создание записи в базе данных
-            payment_data = {
-                "uid": request.uid or 0,
+            payment_data = {  
+                "uid": customer_uid,              
                 "account": request.account,
                 "rq_uid": rq_uid,
                 "order_sum": float(request.amount),
                 "order_create_date": datetime.now(),
                 "order_state": PaymentState.CREATED,
-                "source_payments": request.payment_stat,
+                "source_payments": request.paymentStat,
                 "fiscal_email": str(request.email),
                 "rq_tm": datetime.now()
             }
@@ -120,7 +138,7 @@ class PaymentService:
                     sbp_id=payment.sbp_id,
                     rq_uid=rq_uid,
                     order_id=None,
-                    qr_payload="",
+                    qrcode_link="",
                     qr_url=None,
                     amount=request.amount,
                     status=PaymentState.DECLINED
@@ -146,7 +164,7 @@ class PaymentService:
                     sbp_id=payment.sbp_id,
                     rq_uid=rq_uid,
                     order_id=sberbank_response.get("orderId"),
-                    qr_payload="",
+                    qrcode_link="",
                     qr_url=None,
                     amount=request.amount,
                     status=PaymentState.DECLINED
@@ -172,7 +190,7 @@ class PaymentService:
                 sbp_id=payment.sbp_id,
                 rq_uid=rq_uid,
                 order_id=sberbank_response.get("orderId"),
-                qr_payload=sbp_payload,
+                qrcode_link=sbp_payload,
                 qr_url=sberbank_response.get("formUrl"),
                 amount=request.amount,
                 status=PaymentState.CREATED if sberbank_response.get("errorCode") == "0" else PaymentState.DECLINED
@@ -292,10 +310,11 @@ class PaymentService:
                     "Failed to cancel payment via Sberbank API",
                     order_id=order_id,
                     error_code=error_code,
-                    error_message=error_msg
+                    error_message=error_msg,
+                    result=cancel_result
                 )
                 
-                raise PaymentException(f"Failed to cancel payment: {error_msg}")
+                #raise PaymentException(f"Failed to cancel payment: {error_msg}")
             
             # Обновление статуса в базе
             await self._update_payment_by_id(
@@ -371,10 +390,11 @@ class PaymentService:
                     "Failed to refund payment via Sberbank API",
                     order_id=order_id,
                     error_code=error_code,
-                    error_message=error_msg
+                    error_message=error_msg,
+                    result=refund_result
                 )
                 
-                raise PaymentException(f"Failed to refund payment: {error_msg}")
+                #raise PaymentException(f"Failed to refund payment: {error_msg}")
             
             # Обновление статуса в базе
             await self._update_payment_by_id(
@@ -801,3 +821,27 @@ class PaymentService:
             "subscriptionCreated": PaymentState.PAID   # подписка создана
         }
         return operation_map.get(operation, PaymentState.CREATED)
+    
+    
+    async def _get_customer_uid(self, account: str) -> Optional[int]:
+        """
+        Проверка наличия дубля платежа в таблице FEE
+        
+        Args:
+            pin: Договор           
+            
+        Returns:
+            Optional[int]: uid существующей записи или None если её нет
+        """
+        query = text("""
+            SELECT uid FROM CUSTOMER 
+            WHERE pin = :account
+            LIMIT 1
+        """)
+        
+        result = await self.db.execute(query, {            
+            "account": account
+        })
+        
+        row = result.fetchone()
+        return row[0] if row else None

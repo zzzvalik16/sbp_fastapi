@@ -55,7 +55,7 @@ async def create_payment(
 
 
 @router.get(
-    "/{order_id}/status",
+    "/status/{order_id}",
     response_model=PaymentStatusResponse,
     summary="Получение статуса платежа",
     description="Получение текущего статуса платежа по ID заказа в Сбербанке"
@@ -87,7 +87,7 @@ async def get_payment_status(
 
 
 @router.post(
-    "/{order_id}/cancel",
+    "/cancel/{order_id}",
     response_model=PaymentCancelResponse,
     summary="Отмена платежа",
     description="Отмена платежа в системе НСПК"
@@ -119,7 +119,7 @@ async def cancel_payment(
 
 
 @router.post(
-    "/{order_id}/refund",
+    "/refund/{order_id}",
     response_model=PaymentRefundResponse,
     summary="Возврат платежа",
     description="Возврат платежа полностью или частично"
