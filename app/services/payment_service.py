@@ -66,29 +66,11 @@ class PaymentService:
         """
         try:
             # Генерация уникального идентификатора запроса
-            rq_uid = self._generate_rq_uid()
-            customer_uid = await self._get_customer_uid(request.account)
-            if not customer_uid:                
-                logger.error(
-                    "User not found",
-                    account=request.account,
-                    rq_uid=rq_uid
-                )
-                
-                return PaymentCreateResponse(
-                    success=False,
-                    sbp_id=2,
-                    rq_uid=rq_uid,
-                    order_id=None,
-                    qrcode_link="",
-                    qr_url=None,
-                    amount=request.amount,
-                    status=PaymentState.DECLINED
-                )
+            rq_uid = self._generate_rq_uid()  
             
             # Создание записи в базе данных
-            payment_data = {  
-                "uid": customer_uid,              
+            payment_data = { 
+                "uid": None,                             
                 "account": request.account,
                 "rq_uid": rq_uid,
                 "order_sum": float(request.amount),
@@ -103,6 +85,30 @@ class PaymentService:
                 payment_data["fiscal_phone"] = request.phone
             
             payment = await self._create_payment_log(payment_data)
+
+            customer_uid = await self._get_customer_uid(request.account)
+            if not customer_uid:                
+                logger.error(
+                    "User not found",
+                    account=request.account,
+                    rq_uid=rq_uid
+                )
+                update_data = {
+                    "error_description": "Пользователь не найден", 
+                    "order_state": PaymentState.DECLINED
+                }
+                                
+                await self._update_payment_by_id(payment.sbp_id, update_data)
+                return PaymentCreateResponse(
+                    success=False,
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    order_id=None,
+                    qrcode_link="",
+                    qr_url=None,
+                    amount=request.amount,
+                    status=PaymentState.DECLINED
+                )
             
             # Создание QR кода через API Сбербанка
             sberbank_response = await self.sberbank_service.create_qr_code(
@@ -114,6 +120,7 @@ class PaymentService:
             
             # Обновление записи с данными от банка
             update_data = {
+                "uid": customer_uid, 
                 "error_code": sberbank_response.get("errorCode", "0"),
                 "operation_date_time": datetime.now()
             }
@@ -227,12 +234,15 @@ class PaymentService:
                     new_status = self._map_sberbank_status(
                         sberbank_status.get("orderStatus", 0)
                     )
-                    
+                    update_data = {                           
+                        "error_code": None,
+                        "error_description": None
+                    }
+                    await self._update_payment_by_id(payment.sbp_id, update_data)
+
                     # Обновление статуса в базе, если он изменился
                     if payment.order_state != new_status:
-                        update_data = {
-                            "order_state": new_status
-                        }
+                        update_data["order_state"] = new_status
                         
                         if sberbank_status.get("depositedDate"):
                             update_data["operation_date_time"] = datetime.fromtimestamp(
@@ -362,8 +372,8 @@ class PaymentService:
             if not payment:
                 raise PaymentException("Payment not found")
             
-            if payment.order_state != PaymentState.PAID:
-                raise PaymentException("Payment is not in PAID status")
+           # if payment.order_state != PaymentState.PAID:
+           #     raise PaymentException("Payment is not in PAID status")
             
             refund_amount_kopecks = int((amount or Decimal(str(payment.order_sum))) * 100)
             
@@ -493,7 +503,7 @@ class PaymentService:
                 await self._update_payment_by_id(
                     payment.sbp_id,
                     {
-                        "order_state": PaymentState.DECLINED,
+                       # "order_state": PaymentState.DECLINED,
                         "error_description": f"Callback failed with status {status}",
                         "operation_date_time": datetime.now()
                     }
@@ -595,7 +605,7 @@ class PaymentService:
     
     async def _get_payment_by_order_id(self, order_id: str) -> Optional[PaymentLog]:
         """
-        Поиск платежа по order_id
+        Поиск заказа по order_id
         
         Args:
             order_id: ID заказа в Сбербанке
@@ -614,7 +624,7 @@ class PaymentService:
         update_data: dict
     ) -> None:
         """
-        Обновление платежа по ID
+        Обновление заказа по ID
         
         Args:
             sbp_id: ID записи в таблице PAY_SBP_LOG

@@ -25,9 +25,6 @@ def setup_logging(log_level: str = "INFO") -> None:
     # Настройка файлового логирования
     file_handler = logging.FileHandler(
         os.path.join(log_dir, "app.log"),
-        when="midnight",
-        interval=1,
-        backupCount=30,
         encoding="utf-8"
     )
     file_handler.setLevel(getattr(logging, log_level.upper()))

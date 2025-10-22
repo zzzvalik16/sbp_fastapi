@@ -154,8 +154,9 @@ class SberbankService:
             logger.info(
                 "Payment status retrieved",
                 order_id=order_id,
-                order_status=result.get("orderStatus"),
-                error_code=result.get("errorCode")
+                #order_status=result.get("orderStatus"),
+                #error_code=result.get("errorCode"),
+                result=result
             )
             
             return result
@@ -188,7 +189,7 @@ class SberbankService:
         Raises:
             SberbankAPIException: При ошибке API Сбербанка
         """
-        url = f"{self.base_url}/reverse.do"
+        url = f"{self.base_url}/decline.do"
         
         data = {
             "userName": self.username,
@@ -274,6 +275,7 @@ class SberbankService:
                 "Payment refunded",
                 order_id=order_id,
                 amount=amount,
+                result=result,
                 error_code=result.get("errorCode")
             )
             
