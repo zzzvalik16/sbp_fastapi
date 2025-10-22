@@ -31,32 +31,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         None: Контекст выполнения приложения
     """
     # Startup
-    logger.info("Starting SBP API application")
+    logger.info("Starting SBP API")
     await init_db()
-    logger.info("Database initialized successfully")
+    logger.info("Database connection established")
     
     yield
     
     # Shutdown
-    logger.info("Shutting down SBP API application")
+    logger.info("Shutting down SBP API")
 
 
 def create_app() -> FastAPI:
     """
     Создание и настройка FastAPI приложения
-    
+
     Returns:
         FastAPI: Настроенное приложение
     """
     settings = get_settings()
     setup_logging(settings.LOG_LEVEL)
-    
+
+    # Отключаем документацию в продакшене
+    docs_url = "/docs" if settings.DEBUG else None
+    redoc_url = "/redoc" if settings.DEBUG else None
+
     app = FastAPI(
         title="СБП API",
         description="API для работы с Системой Быстрых Платежей через Сбербанк",
         version="1.0.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
         lifespan=lifespan
     )
     

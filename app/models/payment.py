@@ -184,3 +184,74 @@ class Fee(Base):
         Index("comment", "comment"),
         Index("method", "method"),
     )
+
+
+class CallbackLog(Base):
+    """
+    Модель для таблицы CALLBACK_LOG
+    Логирование всех входящих callback уведомлений
+    """
+
+    __tablename__ = "CALLBACK_LOG"
+
+    callback_id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        comment="Уникальный идентификатор записи"
+    )
+    md_order = Column(
+        VARCHAR(100),
+        nullable=False,
+        comment="Уникальный номер заказа в Платежном шлюзе"
+    )
+    order_number = Column(
+        VARCHAR(100),
+        nullable=False,
+        comment="Уникальный номер заказа в системе Партнера"
+    )
+    operation = Column(
+        VARCHAR(50),
+        nullable=False,
+        comment="Тип операции"
+    )
+    status = Column(
+        Integer,
+        nullable=False,
+        comment="Статус операции callback"
+    )
+    additional_params = Column(
+        VARCHAR(1000),
+        nullable=True,
+        comment="Дополнительные параметры в JSON"
+    )
+    received_at = Column(
+        TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        comment="Время получения callback"
+    )
+    remote_addr = Column(
+        VARCHAR(50),
+        nullable=True,
+        comment="IP адрес отправителя"
+    )
+    user_agent = Column(
+        VARCHAR(255),
+        nullable=True,
+        comment="User-Agent отправителя"
+    )
+    processed = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Флаг обработки (0 - не обработан, 1 - обработан)"
+    )
+
+    # Индексы
+    __table_args__ = (
+        Index("idx_md_order", "md_order"),
+        Index("idx_order_number", "order_number"),
+        Index("idx_received_at", "received_at"),
+        Index("idx_processed", "processed"),
+    )

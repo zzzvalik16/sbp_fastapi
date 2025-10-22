@@ -7,39 +7,39 @@ help: ## Показать справку
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$\' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 build: ## Собрать Docker образы
-	docker-compose build
+	docker-compose -f docker/docker-compose.yml build
 
 up: ## Запустить все сервисы
-	docker-compose up -d
+	docker-compose -f docker/docker-compose.yml up -d
 	@echo "Сервисы запущены:"
 	@echo "  - API: http://localhost:8000"
-	@echo "  - Docs: http://localhost:8000/docs"
+	@echo "  - Docs: http://localhost:8000/docs (только в DEBUG режиме)"
 	@echo "  - phpMyAdmin: http://localhost:8080"
 	@echo "  - MySQL: localhost:3306"
 
 down: ## Остановить все сервисы
-	docker-compose down
+	docker-compose -f docker/docker-compose.yml down
 
 restart: ## Перезапустить все сервисы
-	docker-compose restart
+	docker-compose -f docker/docker-compose.yml restart
 
 logs: ## Показать логи всех сервисов
-	docker-compose logs -f
+	docker-compose -f docker/docker-compose.yml logs -f
 
 logs-app: ## Показать логи приложения
-	docker-compose logs -f app
+	docker-compose -f docker/docker-compose.yml logs -f app
 
 logs-mysql: ## Показать логи MySQL
-	docker-compose logs -f mysql
+	docker-compose -f docker/docker-compose.yml logs -f mysql
 
 shell: ## Войти в контейнер приложения
-	docker-compose exec app bash
+	docker-compose -f docker/docker-compose.yml exec app bash
 
 mysql: ## Войти в MySQL консоль
-	docker-compose exec mysql mysql -u root -proot_password sbp_api
+	docker-compose -f docker/docker-compose.yml exec mysql mysql -u root -proot_password sbp_api
 
 clean: ## Очистить все данные и образы
-	docker-compose down -v
+	docker-compose -f docker/docker-compose.yml down -v
 	docker system prune -f
 
 install: ## Первоначальная установка
@@ -61,7 +61,7 @@ test: ## Тестирование API
 		| python -m json.tool
 
 status: ## Показать статус сервисов
-	docker-compose ps
+	docker-compose -f docker/docker-compose.yml ps
 
 dev: ## Запуск в режиме разработки
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

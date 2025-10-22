@@ -4,6 +4,7 @@
 
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 import structlog
@@ -79,12 +80,13 @@ async def get_db_safe() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """
     Инициализация базы данных
+    Проверяет соединение, но не создает таблицы автоматически
     """
     try:
         async with engine.begin() as conn:
-            # Создание всех таблиц
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables created successfully")
+            # Проверка соединения с базой данных
+            await conn.execute(text("SELECT 1"))
+        logger.info("Database connection established")
     except Exception as e:
-        logger.error("Failed to initialize database", error=str(e))
+        logger.error("Failed to connect to database", error=str(e))
         raise
