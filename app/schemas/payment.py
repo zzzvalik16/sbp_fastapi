@@ -130,34 +130,49 @@ class PaymentRefundResponse(BaseModel):
 
 class CallbackPaymentData(BaseModel):
     """
-    Схема данных callback уведомления о платеже
+    Схема данных callback уведомления о платеже от Сбербанка
+
+    Обязательные поля:
+    - mdOrder: Номер заказа в платежном шлюзе
+    - orderNumber: Номер заказа в системе партнера
+    - operation: Тип операции (например: deposited, approved, reversed)
+    - status: Статус операции (0-10)
+
+    Необязательные поля:
+    - checksum: Контрольная сумма для проверки подлинности
+    - additionalParams: Дополнительные параметры от платежной системы
     """
-    
+
     mdOrder: str = Field(
-        ..., 
+        ...,
         min_length=1,
         max_length=100,
-        description="Уникальный номер заказа в Платёжном шлюзе (UUID)"
+        description="Уникальный номер заказа в Платежном шлюзе (обязательно)"
     )
     orderNumber: str = Field(
         ...,
         min_length=1,
         max_length=100,
-        description="Уникальный номер заказа в системе Партнера"
+        description="Уникальный номер заказа в системе Партнера (обязательно)"
     )
     operation: str = Field(
         ...,
         min_length=1,
         max_length=50,
-        description="Тип операции"
+        description="Тип операции (обязательно)"
     )
     status: int = Field(
-        ..., 
-        ge=0, 
-        le=10, 
-        description="Статус операции callback (0 - неуспешно, 1 - успешно)"
+        ...,
+        ge=0,
+        le=10,
+        description="Статус операции callback: 0-неуспешно, 1-успешно (обязательно)"
+    )
+    checksum: Optional[str] = Field(
+        default=None,
+        max_length=256,
+        description="Контрольная сумма для проверки подлинности (необязательно)"
     )
     additionalParams: Optional[dict] = Field(
-        default_factory=dict,
-        description="Дополнительные параметры"
+        default=None,
+        description="Дополнительные параметры от платежной системы (необязательно)"
     )
