@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 
 
 @router.post(
-    "/",
+    "/callback",
     status_code=status.HTTP_200_OK,
     summary="Callback уведомления о платежах",
     description="Обработка callback уведомлений от Сбербанка о статусе платежей"

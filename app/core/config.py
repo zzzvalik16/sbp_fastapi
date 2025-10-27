@@ -35,21 +35,19 @@ class Settings(BaseSettings):
     
     # Сбербанк API
     SBERBANK_API_URL: str = Field(
-        default="https://ecomtest.sberbank.ru/ecomm/gw/partner/api/v1",
+        default="https://ecomift.sberbank.ru/ecomm/gw/partner/api/v1",
         description="URL API Сбербанка"
     )
     SBERBANK_API_URL_PROD: str = Field(
-        default="https://ecommerce.sberbank.ru/ecomm/gw/partner/api/v1",
+        default="https://epay.sberbank.ru/ecomm/gw/partner/api/v1",
         description="URL продакшн API Сбербанка"
     )
     SBERBANK_USERNAME: str = Field(..., description="Логин Сбербанк API")
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
-    SBERBANK_RETURN_URL: str = Field(
-        default="https://sbp-api.starlink.ru/api/v1/callback",
-        description="URL для получения статуса от банка"
-    )
+    SBERBANK_RETURN_URL: str = Field(default="https://stat.starlink.ru/payment/", description="URL для получения статуса от банка")
     
     # АТОЛ фискализация
+    ATOL_PAYMENT_ID: str = Field(default="SBP", description="ATOL_PAYMENT_ID")
     ATOL_LOGIN: str = Field(..., description="Логин АТОЛ")
     ATOL_PASSWORD: str = Field(..., description="Пароль АТОЛ")
     ATOL_URL: str = Field(

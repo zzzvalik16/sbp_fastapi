@@ -78,7 +78,6 @@ class SberbankService:
                 jsonParams=jsonDopParams,
                 description=description,
                 email=email
-
             )
             
             response = await self.client.post(url, json=data)
@@ -90,6 +89,13 @@ class SberbankService:
             result = self._filter_null_values(result)    
             
             if result.get("errorCode") != "0":
+                logger.error(
+                    "QR code create error",
+                    #result=result
+                    order_number=order_number,
+                    order_id=result.get("orderId"),
+                    error_code=result.get("errorCode")
+                )
                 raise SberbankAPIException(
                     f"Sberbank API error: {result.get('errorMessage', 'Unknown error')}",
                     details=result
@@ -97,6 +103,7 @@ class SberbankService:
             
             logger.info(
                 "QR code created successfully",
+                #result=result
                 order_number=order_number,
                 order_id=result.get("orderId"),
                 error_code=result.get("errorCode")
@@ -154,9 +161,9 @@ class SberbankService:
             logger.info(
                 "Payment status retrieved",
                 order_id=order_id,
-                #order_status=result.get("orderStatus"),
-                #error_code=result.get("errorCode"),
-                result=result
+                order_status=result.get("orderStatus"),
+                error_code=result.get("errorCode"),
+                #result=result
             )
             
             return result
@@ -275,7 +282,7 @@ class SberbankService:
                 "Payment refunded",
                 order_id=order_id,
                 amount=amount,
-                result=result,
+                #result=result,
                 error_code=result.get("errorCode")
             )
             

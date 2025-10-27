@@ -23,9 +23,10 @@ class AtolService:
     def __init__(self):
         """Инициализация сервиса АТОЛ"""
         self.settings = get_settings()
+        self.url = self.settings.ATOL_URL
         self.login = self.settings.ATOL_LOGIN
         self.password = self.settings.ATOL_PASSWORD
-        self.url = self.settings.ATOL_URL
+        self.payment_id = self.settings.ATOL_PAYMENT_ID
         
         self.client = httpx.AsyncClient(
             timeout=30.0,
@@ -70,7 +71,7 @@ class AtolService:
                 "login": self.login,
                 "hash": hash_string,
                 "timestamp": timestamp,
-                "payment_id": "SBP",
+                "payment_id": self.payment_id,
                 "pin": account,
                 "external_id": str(fid),
                 "operation": "sell",

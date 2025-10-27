@@ -66,7 +66,7 @@ class PaymentCreateResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
     order_id: Optional[str] = Field(default=None, description="ID заказа в Сбербанке")
     qrcode_link: str = Field(..., description="Платежная ссылка для QR кода")
@@ -81,7 +81,7 @@ class PaymentStatusResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
     order_id: Optional[str] = Field(default=None, description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Статус платежа")
@@ -97,7 +97,7 @@ class PaymentCancelResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     order_id: str = Field(..., description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Новый статус платежа")
     message: str = Field(..., description="Сообщение об операции")
@@ -121,7 +121,7 @@ class PaymentRefundResponse(BaseModel):
     """
     
     success: bool = Field(..., description="Статус успешности операции")
-    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG")
+    sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     order_id: str = Field(..., description="ID заказа в Сбербанке")
     status: PaymentState = Field(..., description="Новый статус платежа")
     refund_amount: Decimal = Field(..., description="Сумма возврата")

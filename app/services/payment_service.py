@@ -321,7 +321,7 @@ class PaymentService:
                     order_id=order_id,
                     error_code=error_code,
                     error_message=error_msg,
-                    result=cancel_result
+                    #result=cancel_result
                 )
                 
                 #raise PaymentException(f"Failed to cancel payment: {error_msg}")
@@ -335,7 +335,7 @@ class PaymentService:
                 }
             )
             
-            logger.info("Payment cancelled successfully", order_id=order_id)
+            logger.info("Payment cancelled successfully", result=cancel_result)
             
             return PaymentCancelResponse(
                 success=True,
@@ -453,9 +453,9 @@ class PaymentService:
         try:
             logger.info(
                 "Processing callback payment",
-                md_order=md_order,
-                order_number=order_number,
                 operation=operation,
+                md_order=md_order,
+                order_number=order_number,                
                 status=status,
                 additional_params=additional_params
             )
@@ -515,12 +515,12 @@ class PaymentService:
             
             logger.info(
                 "Mapped payment status from operation",
+                operation=operation,
                 md_order=md_order,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
                 old_status=payment.order_state,
-                new_status=new_status,
-                operation=operation
+                new_status=new_status                
             )
             
             # Обновление статуса в базе
@@ -536,10 +536,10 @@ class PaymentService:
             if operation == "deposited" and new_status == PaymentState.PAID:
                 logger.info(
                     "Processing PAID status from callback",
+                    operation=operation,
                     md_order=md_order,
                     order_number=order_number,
-                    sbp_id=payment.sbp_id,
-                    operation=operation
+                    sbp_id=payment.sbp_id                    
                 )
                 
                 # Обновляем данные платежа для актуальной информации
@@ -554,19 +554,19 @@ class PaymentService:
             
             logger.info(
                 "Callback payment processed",
+                operation=operation,
                 md_order=md_order,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
-                callback_status=status,
-                operation=operation
+                callback_status=status
             )
             
         except Exception as e:
             logger.error(
                 "Failed to process callback payment",
-                md_order=md_order,
-                order_number=order_number,
                 operation=operation,
+                md_order=md_order,
+                order_number=order_number,                
                 status=status,
                 error=str(e),
                 exc_info=True
@@ -593,7 +593,7 @@ class PaymentService:
         Поиск платежа по sbp_id
         
         Args:
-            sbp_id: ID записи в таблице PAY_SBP_LOG
+            sbp_id: ID записи в таблице PAY_SBP_LOG2
             
         Returns:
             Optional[PaymentLog]: Найденный платеж или None
@@ -627,7 +627,7 @@ class PaymentService:
         Обновление заказа по ID
         
         Args:
-            sbp_id: ID записи в таблице PAY_SBP_LOG
+            sbp_id: ID записи в таблице PAY_SBP_LOG2
             update_data: Данные для обновления
         """
         payment = await self._get_payment_by_id(sbp_id)

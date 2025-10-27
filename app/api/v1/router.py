@@ -17,7 +17,7 @@ api_v1_router.include_router(
 
 api_v1_router.include_router(
     callback.router,
-    prefix="/callback",
+    prefix="",
     tags=["callbacks"]
 )
 

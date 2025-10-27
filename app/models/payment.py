@@ -32,11 +32,11 @@ class PaymentState(str, Enum):
 
 class PaymentLog(Base):
     """
-    Модель для таблицы PAY_SBP_LOG
+    Модель для таблицы PAY_SBP_LOG2
     Логирование всех операций с платежами СБП
     """
     
-    __tablename__ = "PAY_SBP_LOG"
+    __tablename__ = "PAY_SBP_LOG2"
     
     sbp_id = Column(
         Integer,

@@ -86,7 +86,7 @@ async def get_payment_status(
         )
 
 
-@router.post(
+@router.get(
     "/cancel/{order_id}",
     response_model=PaymentCancelResponse,
     summary="Отмена платежа",
