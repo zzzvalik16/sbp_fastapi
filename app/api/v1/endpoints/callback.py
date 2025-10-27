@@ -41,9 +41,8 @@ async def handle_payment_callback(
         HTTPException: При ошибке валидации callback
     """
     try:
-        logger.info("Callback received", md_order=callback_data.mdOrder)
+        logger.warning("Callback received", order=callback_data.orderNumber)
 
-        # Обработка уведомления о платеже
         await payment_service.process_callback_payment(
             md_order=callback_data.mdOrder,
             order_number=callback_data.orderNumber,
@@ -51,15 +50,15 @@ async def handle_payment_callback(
             status=callback_data.status,
             additional_params=callback_data.additionalParams
         )
-        
-        logger.info("Callback processed", md_order=callback_data.mdOrder)
+
+        logger.warning("Callback processed", order=callback_data.orderNumber, status=callback_data.status)
 
         return {"status": "success", "message": "Callback processed"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Callback processing failed", error=str(e))
+        logger.critical("Callback failed", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process callback"

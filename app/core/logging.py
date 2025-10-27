@@ -10,17 +10,20 @@ from logging.handlers import TimedRotatingFileHandler
 import structlog
 
 
-def setup_logging(log_level: str = "INFO") -> None:
+def setup_logging(log_level: str = "WARNING", debug: bool = False) -> None:
     """
     Настройка структурированного логирования с ежедневной ротацией
 
     Args:
-        log_level: Уровень логирования
+        log_level: Уровень логирования (WARNING по умолчанию)
+        debug: Режим отладки для подробного вывода
     """
-    # Создание директории для логов
     log_dir = "logs"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+
+    # Определяем уровень логирования
+    level = logging.DEBUG if debug else getattr(logging, log_level.upper(), logging.WARNING)
 
     # Настройка файлового логирования с ротацией
     file_handler = TimedRotatingFileHandler(
@@ -31,35 +34,66 @@ def setup_logging(log_level: str = "INFO") -> None:
         encoding="utf-8"
     )
     file_handler.suffix = "%Y-%m-%d"
-    file_handler.setLevel(getattr(logging, log_level.upper()))
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    file_handler.setLevel(level)
+
+    if debug:
+        file_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+    else:
+        file_formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
     file_handler.setFormatter(file_formatter)
 
     # Настройка консольного логирования
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-    console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+    console_handler.setLevel(level)
+
+    if debug:
+        console_formatter = logging.Formatter('%(levelname)s [%(name)s]: %(message)s')
+    else:
+        console_formatter = logging.Formatter('%(levelname)s: %(message)s')
     console_handler.setFormatter(console_formatter)
+
+    # Отключаем логи от библиотек
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
 
     # Настройка стандартного логирования
     logging.basicConfig(
         format="%(message)s",
         handlers=[console_handler, file_handler],
-        level=getattr(logging, log_level.upper()),
+        level=level,
+        force=True
     )
 
-    # Настройка structlog с упрощенным выводом
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_log_level,
+    # Настройка structlog
+    processors = [
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_log_level,
+        structlog.processors.format_exc_info,
+    ]
+
+    if debug:
+        processors.extend([
+            structlog.stdlib.add_logger_name,
+            structlog.processors.CallsiteParameterAdder(
+                [structlog.processors.CallsiteParameter.FUNC_NAME]
+            ),
             structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
-            structlog.processors.format_exc_info,
-            structlog.dev.ConsoleRenderer() if sys.stdout.isatty() else structlog.processors.JSONRenderer()
-        ],
+        ])
+
+    processors.append(
+        structlog.dev.ConsoleRenderer() if sys.stdout.isatty() else structlog.processors.JSONRenderer()
+    )
+
+    structlog.configure(
+        processors=processors,
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,

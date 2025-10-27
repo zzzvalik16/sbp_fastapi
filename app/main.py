@@ -31,14 +31,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         None: Контекст выполнения приложения
     """
     # Startup
-    logger.info("Starting SBP API")
+    logger.warning("Starting SBP API")
     await init_db()
-    logger.info("Database connection established")
-    
+
     yield
-    
+
     # Shutdown
-    logger.info("Shutting down SBP API")
+    logger.warning("Shutting down SBP API")
 
 
 def create_app() -> FastAPI:
@@ -49,7 +48,7 @@ def create_app() -> FastAPI:
         FastAPI: Настроенное приложение
     """
     settings = get_settings()
-    setup_logging(settings.LOG_LEVEL)
+    setup_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
 
     # Отключаем документацию в продакшене
     docs_url = "/docs" if settings.DEBUG else None

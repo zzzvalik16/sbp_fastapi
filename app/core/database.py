@@ -39,7 +39,7 @@ class Base(DeclarativeBase):
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency для получения сессии базы данных
-    
+
     Yields:
         AsyncSession: Сессия базы данных
     """
@@ -47,7 +47,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         except Exception as e:
-            logger.error("Database session error", error=str(e), exc_info=True)
+            logger.error("Database session error", error=str(e))
             await session.rollback()
             raise
         finally:
@@ -58,7 +58,7 @@ async def get_db_safe() -> AsyncGenerator[AsyncSession, None]:
     """
     Безопасная версия dependency для получения сессии базы данных
     Используется в callback endpoints где важна стабильность
-    
+
     Yields:
         AsyncSession: Сессия базы данных
     """
@@ -68,7 +68,7 @@ async def get_db_safe() -> AsyncGenerator[AsyncSession, None]:
         yield session
         await session.commit()
     except Exception as e:
-        logger.error("Database session error", error=str(e), exc_info=True)
+        logger.error("Database session error", error=str(e))
         if session:
             await session.rollback()
         raise
@@ -84,9 +84,8 @@ async def init_db() -> None:
     """
     try:
         async with engine.begin() as conn:
-            # Проверка соединения с базой данных
             await conn.execute(text("SELECT 1"))
-        logger.info("Database connection established")
+        logger.warning("Database connected")
     except Exception as e:
-        logger.error("Failed to connect to database", error=str(e))
+        logger.critical("Database connection failed", error=str(e))
         raise

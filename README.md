@@ -123,6 +123,10 @@ cp .env.example .env
 
 Основные настройки:
 ```env
+# Режим работы
+DEBUG=false              # false - продакшн, true - разработка
+LOG_LEVEL=WARNING        # WARNING - стандартный уровень
+
 # База данных
 DB_HOST=mysql
 DB_USER=sbp_user
@@ -137,6 +141,10 @@ SBERBANK_PASSWORD=your_password
 ATOL_LOGIN=your_atol_login
 ATOL_PASSWORD=your_atol_password
 ```
+
+**Важно**:
+- В продакшене всегда используйте `DEBUG=false` и `LOG_LEVEL=WARNING`
+- В разработке используйте `DEBUG=true` для подробных логов и доступа к документации API
 
 ### 4. Запуск сервисов (Docker)
 
@@ -339,18 +347,52 @@ make format        # Форматирование
 
 ## Логирование
 
-Логирование настроено с ежедневной ротацией файлов:
+### Конфигурация
+
+Логирование настроено с двумя режимами работы:
+
+**Продакшн режим (DEBUG=false)**:
+- Уровень логирования: WARNING и выше (WARNING, ERROR, CRITICAL)
+- Минимальный вывод без лишних деталей
+- Формат: `YYYY-MM-DD HH:MM:SS - LEVEL - message`
+
+**Режим разработки (DEBUG=true)**:
+- Уровень логирования: DEBUG и выше (все логи)
+- Подробный вывод с именами модулей, функций и номерами строк
+- Формат: `YYYY-MM-DD HH:MM:SS - module - LEVEL - function:line - message`
+
+### Ротация логов
+
 - Новый лог-файл создается каждый день в полночь
 - Старые логи хранятся 30 дней
-- Логи записываются в директорию `logs/` (защищена от внешнего доступа)
-- Формат: `app.log` (текущий) и `app.log.YYYY-MM-DD` (архивные)
+- Формат файлов: `app.log` (текущий) и `app.log.YYYY-MM-DD` (архивные)
+- Логи записываются в директорию `logs/`
 
-Все операции логируются в упрощенном формате для лучшей читаемости:
+### Примеры логов
 
+Продакшн режим (DEBUG=false):
 ```
-2025-10-22 12:00:00 - INFO - Callback received
-2025-10-22 12:00:01 - INFO - Callback processed
+2025-10-27 12:00:00 - WARNING - Starting SBP API
+2025-10-27 12:00:01 - WARNING - Database connected
+2025-10-27 12:05:23 - WARNING - Callback received
+2025-10-27 12:05:24 - WARNING - Callback processed
+2025-10-27 12:10:00 - ERROR - Payment processing failed
 ```
+
+Режим разработки (DEBUG=true):
+```
+2025-10-27 12:00:00 - app.main - WARNING - lifespan:34 - Starting SBP API
+2025-10-27 12:00:01 - app.core.database - WARNING - init_db:88 - Database connected
+2025-10-27 12:05:23 - app.api.v1.endpoints.callback - WARNING - handle_payment_callback:44 - Callback received
+```
+
+### Уровни логирования
+
+- **CRITICAL** - Критические ошибки (сбой БД, неработающая система)
+- **ERROR** - Ошибки, требующие внимания
+- **WARNING** - Важные события (старт/стоп, callback, операции)
+- **INFO** - Информационные сообщения (только в DEBUG режиме)
+- **DEBUG** - Детальная отладочная информация (только в DEBUG режиме)
 
 ## Безопасность
 
