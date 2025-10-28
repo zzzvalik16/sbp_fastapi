@@ -31,13 +31,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         None: Контекст выполнения приложения
     """
     # Startup
-    logger.warning("Starting SBP API")
+    logger.info("Starting SBP API")
     await init_db()
 
     yield
 
     # Shutdown
-    logger.warning("Shutting down SBP API")
+    logger.info("Shutting down SBP API")
 
 
 def create_app() -> FastAPI:

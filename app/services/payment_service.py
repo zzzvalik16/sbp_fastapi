@@ -76,13 +76,15 @@ class PaymentService:
                 "order_sum": float(request.amount),
                 "order_create_date": datetime.now(),
                 "order_state": PaymentState.CREATED,
-                "source_payments": request.paymentStat,
-                "fiscal_email": str(request.email),
+                "source_payments": request.paymentStat,                
                 "rq_tm": datetime.now()
             }
             
             if request.phone:
                 payment_data["fiscal_phone"] = request.phone
+
+            if request.email:
+                payment_data["fiscal_email"] = request.email    
             
             payment = await self._create_payment_log(payment_data)
 

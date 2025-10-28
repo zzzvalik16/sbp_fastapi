@@ -64,11 +64,14 @@ class SberbankService:
             "orderNumber": order_number,
             "amount": amount,
             "returnUrl": self.return_url,
-            "description": description,
-            "email": email,
+            "description": description,            
             "jsonParams": jsonDopParams
         }
-        
+       
+        if email and email.strip():
+            # Здесь email — это строка, содержащая хотя бы один символ, кроме пробелов
+            data["email"] = email.strip()     
+          
         try:
             logger.info(
                 "Creating QR code",
@@ -217,7 +220,6 @@ class SberbankService:
             
             logger.info(
                 "Payment cancelled",
-                data=data,
                 order_id=order_id,
                 error_code=result.get("errorCode")
             )

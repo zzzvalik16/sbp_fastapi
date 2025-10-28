@@ -84,8 +84,9 @@ async def init_db() -> None:
     """
     try:
         async with engine.begin() as conn:
+            # Проверка соединения с базой данных
             await conn.execute(text("SELECT 1"))
-        logger.warning("Database connected")
+        logger.info("Database connection established")
     except Exception as e:
-        logger.critical("Database connection failed", error=str(e))
+        logger.error("Failed to connect to database", error=str(e))
         raise

@@ -22,8 +22,8 @@ class PaymentCreateRequest(BaseModel):
         le=999999999999,
         description="Сумма платежа в рублях"
     )
-    email: EmailStr = Field(
-        ...,
+    email: Optional[str] = Field(
+        default=None,
         description="Email плательщика"
     )
     account: str = Field(

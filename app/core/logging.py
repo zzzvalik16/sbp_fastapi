@@ -10,7 +10,7 @@ from logging.handlers import TimedRotatingFileHandler
 import structlog
 
 
-def setup_logging(log_level: str = "WARNING", debug: bool = False) -> None:
+def setup_logging(log_level: str = "INFO", debug: bool = False) -> None:
     """
     Настройка структурированного логирования с ежедневной ротацией
 
