@@ -189,8 +189,7 @@ class PaymentService:
             logger.info(
                 "Payment created successfully",
                 order_id=sberbank_response.get("orderId"),
-                sbp_id=payment.sbp_id,                
-                order_id=sberbank_response.get("orderId"),
+                sbp_id=payment.sbp_id,
                 amount=request.amount
             )
             
