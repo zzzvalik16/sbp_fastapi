@@ -37,9 +37,9 @@ class AtolService:
         self,
         account: str,
         fid: int,
-        rq_uid: str,
+        order_id: str,
         amount: float,
-        email: str,
+        email: Optional[str] = None,
         phone: Optional[str] = None
     ) -> dict:
         """
@@ -48,7 +48,7 @@ class AtolService:
         Args:
             account: Номер лицевого счета
             fid: ID записи в таблице FEE
-            rq_uid: Уникальный идентификатор запроса
+            order_id: Уникальный идентификатор запроса
             amount: Сумма платежа
             email: Email для отправки чека
             phone: Телефон для отправки чека
@@ -74,8 +74,7 @@ class AtolService:
                 "payment_id": self.payment_id,
                 "pin": account,
                 "external_id": str(fid),
-                "operation": "sell",
-                "email": email,
+                "operation": "sell",                
                 "receipt": [
                     {
                         "price": amount,
@@ -84,13 +83,15 @@ class AtolService:
                 ]
             }
             
+            if email:
+                data["email"] = email
             if phone:
                 data["phone"] = phone
             
-            logger.info(
+            logger.debug(
                 "Sending fiscal receipt",
-                fid=fid,
-                rq_uid=rq_uid,
+                order_id=order_id,
+                fid=fid,                
                 account=account,
                 amount=amount,
                 email=email
@@ -103,8 +104,8 @@ class AtolService:
             
             logger.info(
                 "Fiscal receipt sent successfully",
-                fid=fid,
-                rq_uid=rq_uid,
+                order_id=order_id,
+                fid=fid,                
                 response=result
             )
             
@@ -113,16 +114,16 @@ class AtolService:
         except httpx.HTTPError as e:
             logger.error(
                 "HTTP error sending fiscal receipt",
-                fid=fid,
-                rq_uid=rq_uid,
+                order_id=order_id,
+                fid=fid,                
                 error=str(e)
             )
             raise AtolException(f"HTTP error sending fiscal receipt: {str(e)}")
         except Exception as e:
             logger.error(
                 "Unexpected error sending fiscal receipt",
-                fid=fid,
-                rq_uid=rq_uid,
+                order_id=order_id,
+                fid=fid,                
                 error=str(e)
             )
             raise AtolException(f"Unexpected error sending fiscal receipt: {str(e)}")

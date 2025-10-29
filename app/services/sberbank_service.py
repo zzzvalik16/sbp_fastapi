@@ -95,8 +95,8 @@ class SberbankService:
                 logger.error(
                     "QR code create error",
                     #result=result
-                    order_number=order_number,
                     order_id=result.get("orderId"),
+                    order_number=order_number,                    
                     error_code=result.get("errorCode")
                 )
                 raise SberbankAPIException(
@@ -107,8 +107,8 @@ class SberbankService:
             logger.info(
                 "QR code created successfully",
                 #result=result
-                order_number=order_number,
                 order_id=result.get("orderId"),
+                order_number=order_number,                
                 error_code=result.get("errorCode")
             )
             

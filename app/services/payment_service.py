@@ -188,8 +188,8 @@ class PaymentService:
             
             logger.info(
                 "Payment created successfully",
-                sbp_id=payment.sbp_id,
-                rq_uid=rq_uid,
+                order_id=sberbank_response.get("orderId"),
+                sbp_id=payment.sbp_id,                
                 order_id=sberbank_response.get("orderId"),
                 amount=request.amount
             )
@@ -337,7 +337,7 @@ class PaymentService:
                 }
             )
             
-            logger.info("Payment cancelled successfully", result=cancel_result)
+            logger.info("Payment cancelled successfully", order_id=order_id, result=cancel_result)
             
             return PaymentCancelResponse(
                 success=True,
@@ -456,7 +456,7 @@ class PaymentService:
             logger.info(
                 "Processing callback payment",
                 operation=operation,
-                md_order=md_order,
+                order_id=md_order,
                 order_number=order_number,                
                 status=status,
                 additional_params=additional_params
@@ -475,7 +475,7 @@ class PaymentService:
                     logger.info(
                         "Payment found by sbp_id",
                         sbp_id=sbp_id,
-                        md_order=md_order
+                        order_id=md_order
                     )
                 except ValueError:
                     logger.warning(
@@ -495,7 +495,7 @@ class PaymentService:
             if status != 1:
                 logger.warning(
                     "Callback operation failed",
-                    md_order=md_order,
+                    order_id=md_order,
                     order_number=order_number,
                     operation=operation,
                     callback_status=status
@@ -515,10 +515,10 @@ class PaymentService:
             # Определяем новый статус на основе типа операции
             new_status = self._map_operation_to_status(operation)
             
-            logger.info(
+            logger.debug(
                 "Mapped payment status from operation",
                 operation=operation,
-                md_order=md_order,
+                order_id=md_order,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
                 old_status=payment.order_state,
@@ -539,7 +539,7 @@ class PaymentService:
                 logger.info(
                     "Processing PAID status from callback",
                     operation=operation,
-                    md_order=md_order,
+                    order_id=md_order,
                     order_number=order_number,
                     sbp_id=payment.sbp_id                    
                 )
@@ -557,7 +557,7 @@ class PaymentService:
             logger.info(
                 "Callback payment processed",
                 operation=operation,
-                md_order=md_order,
+                order_id=md_order,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
                 callback_status=status
@@ -567,7 +567,7 @@ class PaymentService:
             logger.error(
                 "Failed to process callback payment",
                 operation=operation,
-                md_order=md_order,
+                order_id=md_order,
                 order_number=order_number,                
                 status=status,
                 error=str(e),
@@ -650,9 +650,8 @@ class PaymentService:
         try:
             logger.info(
                 "Processing PAID payment",
-                sbp_id=payment.sbp_id,
-                rq_uid=payment.rq_uid,
                 order_id=payment.order_id,
+                sbp_id=payment.sbp_id,               
                 amount=payment.order_sum
             )
             
@@ -678,27 +677,29 @@ class PaymentService:
                 )
                 return
             
-            logger.info(
+            logger.debug(
                 "Payment inserted into FEE table",
+                order_id=payment.order_id,
                 sbp_id=payment.sbp_id,
                 fid=fid
             )
             
             # Отправка фискального чека
-            if payment.fiscal_email:
-                await self.atol_service.send_fiscal_receipt(
-                    account=payment.account,
-                    fid=fid,
-                    rq_uid=payment.rq_uid,
-                    amount=payment.order_sum,
-                    email=payment.fiscal_email,
-                    phone=payment.fiscal_phone
-                )
-                logger.info("Fiscal receipt sent successfully", sbp_id=payment.sbp_id, fid=fid)
+           # if payment.fiscal_email:
+            await self.atol_service.send_fiscal_receipt(
+                account=payment.account,
+                fid=fid,
+                order_id=payment.order_id,
+                amount=payment.order_sum,
+                email=payment.fiscal_email,
+                phone=payment.fiscal_phone
+            )
+            logger.info("Fiscal receipt sent successfully", order_id=payment.order_id, sbp_id=payment.sbp_id, fid=fid)
                 
         except Exception as e:
             logger.error(
                 "Failed to process paid payment",
+                order_id=payment.order_id,
                 sbp_id=payment.sbp_id,
                 error=str(e)
             )
