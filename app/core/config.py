@@ -33,18 +33,19 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = Field(..., description="Пароль базы данных")
     DB_NAME: str = Field(..., description="Имя базы данных")
     
-    # Сбербанк API
-    SBERBANK_API_URL: str = Field(
+    # Сбербанк API    
+    TEST_MODE: bool = Field(default=True, description="Режим работы тестовый иди продакшн")
+    SBERBANK_TEST_URL: str = Field(
         default="https://ecomift.sberbank.ru/ecomm/gw/partner/api/v1",
-        description="URL API Сбербанка"
+        description="Тестовый URL API СБП Сбербанка"
     )
-    SBERBANK_API_URL_PROD: str = Field(
+    SBERBANK_PROD_URL: str = Field(
         default="https://epay.sberbank.ru/ecomm/gw/partner/api/v1",
-        description="URL продакшн API Сбербанка"
+        description="Продакшн URL API СБП Сбербанка"
     )
     SBERBANK_USERNAME: str = Field(..., description="Логин Сбербанк API")
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
-    SBERBANK_RETURN_URL: str = Field(default="https://stat.starlink.ru/payment/", description="URL для получения статуса от банка")
+    SBERBANK_RETURN_URL: str = Field(default="https://stat.starlink.ru/payment/", description="Страница после оплаты")
     
     # АТОЛ фискализация
     ATOL_PAYMENT_ID: str = Field(default="SBP", description="ATOL_PAYMENT_ID")
@@ -79,7 +80,7 @@ class Settings(BaseSettings):
         Returns:
             str: URL API Сбербанка
         """
-        return self.SBERBANK_API_URL_PROD if not self.DEBUG else self.SBERBANK_API_URL
+        return self.SBERBANK_PROD_URL if not self.TEST_MODE else self.SBERBANK_TEST_URL
 
 
 @lru_cache()

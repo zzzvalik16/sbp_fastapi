@@ -68,7 +68,7 @@ async def get_db_safe() -> AsyncGenerator[AsyncSession, None]:
         yield session
         await session.commit()
     except Exception as e:
-        logger.error("Database session error", error=str(e))
+        logger.error("Database session error2", error=str(e))
         if session:
             await session.rollback()
         raise

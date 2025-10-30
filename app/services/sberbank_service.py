@@ -93,23 +93,23 @@ class SberbankService:
             
             if result.get("errorCode") != "0":
                 logger.error(
-                    "QR code create error",
-                    #result=result
+                    "QR code create error",                    
                     order_id=result.get("orderId"),
-                    order_number=order_number,                    
-                    error_code=result.get("errorCode")
+                    result=result
+                    #order_number=order_number,                    
+                    #error_code=result.get("errorCode")
                 )
                 raise SberbankAPIException(
                     f"Sberbank API error: {result.get('errorMessage', 'Unknown error')}",
                     details=result
                 )
             
-            logger.info(
+            logger.debug(
                 "QR code created successfully",
-                #result=result
                 order_id=result.get("orderId"),
-                order_number=order_number,                
-                error_code=result.get("errorCode")
+                result=result                
+                #order_number=order_number,                
+                #error_code=result.get("errorCode")
             )
             
             return result
@@ -161,12 +161,12 @@ class SberbankService:
             # Фильтрация null значений из ответа
             result = self._filter_null_values(result)
             
-            logger.info(
+            logger.debug(
                 "Payment status retrieved",
                 order_id=order_id,
-                order_status=result.get("orderStatus"),
-                error_code=result.get("errorCode"),
-                #result=result
+                result=result
+                #order_status=result.get("orderStatus"),
+                #error_code=result.get("errorCode")                
             )
             
             return result
@@ -208,7 +208,7 @@ class SberbankService:
         }
         
         try:
-            logger.info("Cancelling payment", order_id=order_id, url=url)
+            logger.debug("Cancelling payment", order_id=order_id, url=url)
             
             response = await self.client.post(url, json=data)
             response.raise_for_status()
@@ -265,7 +265,7 @@ class SberbankService:
         }
         
         try:
-            logger.info(
+            logger.debug(
                 "Refunding payment",
                 order_id=order_id,
                 amount=amount,

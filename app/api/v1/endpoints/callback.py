@@ -41,17 +41,17 @@ async def handle_payment_callback(
         HTTPException: При ошибке валидации callback
     """
     try:
-        logger.info("Callback input", md_order=callback_data.mdOrder, order=callback_data.orderNumber)
+        logger.info("Callback input", order_id=callback_data.mdOrder, order=callback_data.orderNumber)
 
         await payment_service.process_callback_payment(
-            md_order=callback_data.mdOrder,
-            order_number=callback_data.orderNumber,
             operation=callback_data.operation,
+            order_id=callback_data.mdOrder,
+            order_number=callback_data.orderNumber,           
             status=callback_data.status,
             additional_params=callback_data.additionalParams
         )
 
-        logger.info("Callback processed", md_order=callback_data.mdOrder, status=callback_data.status)
+        logger.info("Callback processed", order_id=callback_data.mdOrder, status=callback_data.status)
 
         return {"status": "success", "message": "Callback processed"}
         

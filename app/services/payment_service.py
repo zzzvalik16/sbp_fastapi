@@ -438,7 +438,7 @@ class PaymentService:
             raise PaymentException(f"Failed to refund payment: {str(e)}")
     
     async def process_callback_payment(
-        self, md_order: str, order_number: str, operation: str, status: int,
+        self, order_id: str, order_number: str, operation: str, status: int,
         additional_params: Optional[dict] = None
     ) -> None:
         """
@@ -452,10 +452,10 @@ class PaymentService:
             additional_params: Дополнительные параметры
         """
         try:
-            logger.info(
+            logger.debug(
                 "Processing callback payment",
                 operation=operation,
-                order_id=md_order,
+                order_id=order_id,
                 order_number=order_number,                
                 status=status,
                 additional_params=additional_params
@@ -463,8 +463,8 @@ class PaymentService:
             
             # Сначала ищем платеж по order_id (mdOrder)
             payment = None
-            if md_order:
-                payment = await self._get_payment_by_order_id(md_order)
+            if order_id:
+                payment = await self._get_payment_by_order_id(order_id)
             
             # Если не найден, пробуем найти по sbp_id (orderNumber)
             if not payment:
@@ -472,9 +472,9 @@ class PaymentService:
                     sbp_id = int(order_number)
                     payment = await self._get_payment_by_id(sbp_id)
                     logger.info(
-                        "Payment found by sbp_id",
+                        "Payment found by sbp_id callback",
                         sbp_id=sbp_id,
-                        order_id=md_order
+                        order_id=order_id
                     )
                 except ValueError:
                     logger.warning(
@@ -485,7 +485,7 @@ class PaymentService:
                 if not payment:
                     logger.warning(
                         "Payment not found for callback",
-                        md_order=md_order,
+                        order_id=order_id,
                         order_number=order_number
                     )
                     return
@@ -494,7 +494,7 @@ class PaymentService:
             if status != 1:
                 logger.warning(
                     "Callback operation failed",
-                    order_id=md_order,
+                    order_id=order_id,
                     order_number=order_number,
                     operation=operation,
                     callback_status=status
@@ -515,9 +515,9 @@ class PaymentService:
             new_status = self._map_operation_to_status(operation)
             
             logger.debug(
-                "Mapped payment status from operation",
+                "Mapped payment status from operation callback",
                 operation=operation,
-                order_id=md_order,
+                order_id=order_id,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
                 old_status=payment.order_state,
@@ -538,7 +538,7 @@ class PaymentService:
                 logger.info(
                     "Processing PAID status from callback",
                     operation=operation,
-                    order_id=md_order,
+                    order_id=order_id,
                     order_number=order_number,
                     sbp_id=payment.sbp_id                    
                 )
@@ -549,14 +549,14 @@ class PaymentService:
                     await self._process_paid_payment(updated_payment)
                 else:
                     logger.error(
-                        "Failed to get updated payment data",
+                        "Failed to get updated payment data callback",
                         sbp_id=payment.sbp_id
                     )
             
-            logger.info(
+            logger.debug(
                 "Callback payment processed",
                 operation=operation,
-                order_id=md_order,
+                order_id=order_id,
                 order_number=order_number,
                 sbp_id=payment.sbp_id,
                 callback_status=status
@@ -566,7 +566,7 @@ class PaymentService:
             logger.error(
                 "Failed to process callback payment",
                 operation=operation,
-                order_id=md_order,
+                order_id=order_id,
                 order_number=order_number,                
                 status=status,
                 error=str(e),
