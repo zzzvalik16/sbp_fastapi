@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = Field(..., description="Хост базы данных редис")
     REDIS_PORT: int = Field(default=6379, description="Порт базы данных редис")
     REDIS_DB: str = Field(..., description="БД редис")
-    REDIS_LOCK_TTL: str = Field(..., description="В секундах")
+    REDIS_LOCK_TTL: int = Field(..., description="В секундах")
     
     # Сбербанк API    
     TEST_MODE: bool = Field(default=True, description="Режим работы тестовый иди продакшн")
@@ -50,7 +50,9 @@ class Settings(BaseSettings):
     )
     SBERBANK_USERNAME: str = Field(..., description="Логин Сбербанк API")
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
-    SBERBANK_RETURN_URL: str = Field(default="https://stat.starlink.ru/payment/", description="Страница после оплаты")
+    SBERBANK_RETURN_URL: str = Field(default="https://www.starlink.ru/payment/", description="Страница после успешной оплаты")
+    SBERBANK_FAIL_RETURN_URL: str = Field(default="https://www.starlink.ru/payment/", description="Страница после неуспешной оплаты")
+    SBERBANK_QR_TIMEOUT: int = Field(12, description="Время жизни QR кода в минутах")
     
     # АТОЛ фискализация
     ATOL_PAYMENT_ID: str = Field(default="SBP", description="ATOL_PAYMENT_ID")

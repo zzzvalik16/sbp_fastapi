@@ -27,6 +27,8 @@ class SberbankService:
         self.username = self.settings.SBERBANK_USERNAME
         self.password = self.settings.SBERBANK_PASSWORD
         self.return_url = self.settings.SBERBANK_RETURN_URL
+        self.return_fail_url = self.settings.SBERBANK_FAIL_RETURN_URL        
+        self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
         
         self.client = httpx.AsyncClient(
             timeout=30.0,
@@ -66,7 +68,9 @@ class SberbankService:
             "orderNumber": order_number,
             "amount": amount,
             "returnUrl": self.return_url,
-            "description": description,            
+            "failUrl": self.return_fail_url,
+            "description": description, 
+            "sessionTimeoutSecs": self.qr_timeout_secs,           
             "jsonParams": jsonDopParams
         }
        
@@ -82,7 +86,8 @@ class SberbankService:
                 url=url,
                 jsonParams=jsonDopParams,
                 description=description,
-                email=email
+                email=email,
+                sessionTimeoutSecs=self.qr_timeout_secs
             )
             
             response = await self.client.post(url, json=data)
