@@ -250,12 +250,12 @@ class PaymentService:
                                 sberbank_status["depositedDate"] / 1000
                             )
                         
-                        await self._update_payment_by_id(payment.sbp_id, update_data)
+                        #await self._update_payment_by_id(payment.sbp_id, update_data)
                         payment.order_state = new_status
                         
                         # Обработка статуса PAID (orderStatus = 2)
-                        if new_status == PaymentState.PAID:
-                            await self._process_paid_payment(payment)
+                        #if new_status == PaymentState.PAID:
+                            #await self._process_paid_payment(payment)
                             
             except Exception as e:
                 logger.warning(
@@ -544,7 +544,7 @@ class PaymentService:
                 )
                 
                 # Обновляем данные платежа для актуальной информации
-                updated_payment = await self._get_payment_by_id(payment.sbp_id)
+                updated_payment = await  self._get_payment_by_order_id(order_id)
                 if updated_payment:
                     await self._process_paid_payment(updated_payment)
                 else:
@@ -837,7 +837,7 @@ class PaymentService:
     
     async def _get_customer_uid(self, account: str) -> Optional[int]:
         """
-        Проверка наличия дубля платежа в таблице FEE
+        Проверка наличия пользователя в биллинге
         
         Args:
             pin: Договор           

@@ -147,15 +147,7 @@ class SberbankService:
                 error=f"Could not decode JSON response: {str(e)}"
             )
              raise SberbankAPIException(f"Invalid JSON response")
-
-        except httpx.HTTPError as e:
-            logger.error(
-                "HTTP error creating QR code",
-                order_number=order_number,
-                error=str(e)
-            )
-            raise SberbankAPIException(f"HTTP error: {str(e)}")
-        
+               
         except Exception as e: # Ловим все остальные неожиданные ошибки
             logger.error(
                 "Unexpected error creating QR code",
