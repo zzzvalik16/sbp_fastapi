@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     SBERBANK_QR_TIMEOUT: int = Field(12, description="Время жизни QR кода в минутах")
     
     # АТОЛ фискализация
-    ATOL_PAYMENT_ID: str = Field(default="SBP", description="ATOL_PAYMENT_ID")
+    ATOL_PAYMENT_ID: str = Field(default="SBP2", description="ATOL_PAYMENT_ID")
     ATOL_LOGIN: str = Field(..., description="Логин АТОЛ")
     ATOL_PASSWORD: str = Field(..., description="Пароль АТОЛ")
     ATOL_URL: str = Field(
