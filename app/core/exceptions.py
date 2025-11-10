@@ -173,7 +173,7 @@ def add_exception_handlers(app: FastAPI) -> None:
     Args:
         app: Экземпляр FastAPI приложения
     """
-    #app.add_exception_handler(SBPAPIException, sbp_exception_handler)
+    app.add_exception_handler(SBPAPIException, sbp_exception_handler)
     app.add_exception_handler(ValidationError, validation_exception_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)

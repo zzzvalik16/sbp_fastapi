@@ -31,7 +31,7 @@ class SberbankService:
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
         
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=40.0,
             verify=False
         )
     
@@ -93,7 +93,7 @@ class SberbankService:
                 description=description,
                 email=email,
                 sessionTimeoutSecs=self.qr_timeout_secs,
-                source_payments=source_payments
+                source_payments=repr(source_payments)
             )
             
             response = await self.client.post(url, json=data)
