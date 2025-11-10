@@ -117,8 +117,7 @@ class PaymentService:
                 order_number=str(payment.sbp_id),  # Используем sbp_id как orderNumber
                 amount=int(request.amount * 100),  # Конвертация в копейки
                 description=f"Пополнение лицевого счета №{request.account}",
-                email=str(request.email),
-                source_payments=request.paymentStat
+                email=str(request.email)
             )
             
             # Обновление записи с данными от банка
@@ -202,8 +201,7 @@ class PaymentService:
                 qrcode_link=sbp_payload,
                 qr_url=sberbank_response.get("formUrl"),
                 amount=request.amount,
-                status=PaymentState.CREATED if sberbank_response.get("errorCode") == "0" else PaymentState.DECLINED,
-                source_payments=repr(request.paymentStat)
+                status=PaymentState.CREATED if sberbank_response.get("errorCode") == "0" else PaymentState.DECLINED
             )
             
         except Exception as e:

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     SBERBANK_PASSWORD: str = Field(..., description="Пароль Сбербанк API")
     SBERBANK_RETURN_URL: str = Field(default="https://www.starlink.ru/payment/", description="Страница после успешной оплаты")
     SBERBANK_FAIL_RETURN_URL: str = Field(default="https://www.starlink.ru/payment/", description="Страница после неуспешной оплаты")
-    SBERBANK_QR_TIMEOUT: int = Field(12, description="Время жизни QR кода в минутах")
+    SBERBANK_QR_TIMEOUT: int = Field(1440, description="Время жизни QR кода в минутах")
     
     # АТОЛ фискализация
     ATOL_PAYMENT_ID: str = Field(default="SBP2", description="ATOL_PAYMENT_ID")

@@ -31,7 +31,7 @@ class SberbankService:
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
         
         self.client = httpx.AsyncClient(
-            timeout=40.0,
+            timeout=30.0,
             verify=False
         )
     
@@ -40,8 +40,7 @@ class SberbankService:
         order_number: str,
         amount: int,
         description: str,
-        email: str,
-        source_payments: str
+        email: str
     ) -> Dict[str, Any]:
         """
         Создание динамического QR кода СБП
@@ -58,10 +57,7 @@ class SberbankService:
         Raises:
             SberbankAPIException: При ошибке API Сбербанка
         """
-        timeout_value = 86400 # По умолчанию
-        if source_payments == "sbpClient":
-            timeout_value = self.qr_timeout_secs        
-
+       
         url = f"{self.base_url}/register.do"
         jsonDopParams={
                 "qrType": "DYNAMIC_QR_SBP",
@@ -75,7 +71,7 @@ class SberbankService:
             "returnUrl": self.return_url,
             "failUrl": self.return_fail_url,
             "description": description, 
-            "sessionTimeoutSecs": timeout_value,           
+            "sessionTimeoutSecs": self.qr_timeout_secs,           
             "jsonParams": jsonDopParams
         }
        
@@ -92,8 +88,7 @@ class SberbankService:
                 #jsonParams=jsonDopParams,
                 description=description,
                 email=email,
-                sessionTimeoutSecs=self.qr_timeout_secs,
-                source_payments=repr(source_payments)
+                sessionTimeoutSecs=self.qr_timeout_secs
             )
             
             response = await self.client.post(url, json=data)
