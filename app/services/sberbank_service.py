@@ -120,46 +120,43 @@ class SberbankService:
                 #error_code=result.get("errorCode")
             )
             
-            return result  
-        
-        except httpx.Timeout as e: # Специфично ловим таймаут
+            return result
+
+        except SberbankAPIException:
+            raise
+        except httpx.Timeout as e:
             logger.error(
                 "Timeout creating QR code",
                 order_number=order_number,
                 error=f"Request timed out after {e.request.timeout} seconds. {str(e)}"
             )
             raise SberbankAPIException(f"Request timed out: {str(e)}")
-    
-        except httpx.HTTPStatusError as e: # Конкретнее ловим статусные ошибки (4xx, 5xx)
+        except httpx.HTTPStatusError as e:
             logger.error(
                 "HTTP status error creating QR code",
                 order_number=order_number,
                 error=f"Status Code: {e.response.status_code}, Response: {e.response.text}"
             )
             raise SberbankAPIException(f"HTTP status error: {e.response.status_code}")
-
-        except httpx.RequestError as e: # Ловим ошибки запроса (сеть, DNS, таймаут)
+        except httpx.RequestError as e:
             logger.error(
                 "Request error creating QR code",
                 order_number=order_number,
                 error=str(e)
             )
             raise SberbankAPIException(f"Request error: {str(e)}")
-            
-        except json.JSONDecodeError as e: # Ловим ошибки парсинга JSON
-             logger.error(
+        except json.JSONDecodeError as e:
+            logger.error(
                 "JSON decode error creating QR code",
                 order_number=order_number,
                 error=f"Could not decode JSON response: {str(e)}"
             )
-             raise SberbankAPIException(f"Invalid JSON response")
-               
-        except Exception as e: # Ловим все остальные неожиданные ошибки
+            raise SberbankAPIException(f"Invalid JSON response")
+        except Exception as e:
             logger.error(
                 "Unexpected error creating QR code",
                 order_number=order_number,
                 error=str(e),
-                # Дополнительно можно добавить traceback для отладки
                 traceback=traceback.format_exc()
             )
             raise SberbankAPIException(f"An unexpected error occurred: {str(e)}")       
