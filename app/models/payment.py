@@ -183,4 +183,5 @@ class Fee(Base):
         Index("ticket_id", "ticket_id"),
         Index("comment", "comment"),
         Index("method", "method"),
+        Index("uq_fee_payment", "uid", "comment", "ticket_id", unique=True),
     )

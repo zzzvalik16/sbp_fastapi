@@ -641,8 +641,8 @@ class PaymentService:
     async def _process_paid_payment(self, payment: PaymentLog) -> None:
         """
         Обработка платежа со статусом PAID (orderStatus = 2)
-        Проверяет наличие платежа в БД и если его нет - начисляет и отправляет на фискализацию
-        
+        Вставляет платеж в таблицу FEE с атомарной защитой от дубликатов
+
         Args:
             payment: Платеж для обработки
         """
@@ -650,27 +650,15 @@ class PaymentService:
             logger.info(
                 "Processing PAID payment",
                 order_id=payment.order_id,
-                sbp_id=payment.sbp_id,               
+                sbp_id=payment.sbp_id,
                 amount=payment.order_sum
             )
-            
-            # Проверка на дубли платежа в таблице FEE
-            existing_fee = await self._check_fee_duplicate(payment.order_id, payment.uid)
-            if existing_fee:
-                logger.warning(
-                    "Duplicate payment found in FEE table, skipping fiscal receipt",
-                    order_id=payment.order_id,
-                    uid=payment.uid,
-                    existing_fid=existing_fee
-                )
-                return
-            
-            # Сохранение в таблицу FEE
+
             fid = await self._insert_to_fee(payment)
-            
+
             if fid is None:
                 logger.warning(
-                    "Failed to insert into FEE table, skipping fiscal receipt",
+                    "Duplicate payment or failed to insert into FEE table",
                     order_id=payment.order_id,
                     uid=payment.uid
                 )
@@ -703,73 +691,52 @@ class PaymentService:
                 error=str(e)
             )
     
-    async def _check_fee_duplicate(self, order_id: str, uid: int) -> Optional[int]:
-        """
-        Проверка наличия дубля платежа в таблице FEE
-        
-        Args:
-            order_id: ID заказа в Сбербанке
-            uid: ID пользователя
-            
-        Returns:
-            Optional[int]: fid существующей записи или None если дубля нет
-        """
-        query = text("""
-            SELECT fid FROM FEE 
-            WHERE comment = :order_id AND uid = :uid AND ticket_id = 'SBP'
-            LIMIT 1
-        """)
-        
-        result = await self.db.execute(query, {
-            "order_id": order_id,
-            "uid": uid
-        })
-        
-        row = result.fetchone()
-        return row[0] if row else None
-    
     async def _insert_to_fee(self, payment: PaymentLog) -> Optional[int]:
         """
-        Вставка записи в таблицу FEE с проверкой на дубли
-        
+        Вставка записи в таблицу FEE с защитой от дубликатов на уровне БД
+
+        Использует уникальный индекс (uid, comment, ticket_id) для атомарной
+        защиты от race conditions при одновременных платежах.
+
         Args:
             payment: Данные платежа
-            
+
         Returns:
             Optional[int]: ID созданной записи или None если дубль
         """
-        # Определение даты платежа согласно логике из требований
         date_pay = payment.operation_date_time if payment.operation_date_time else (
             payment.rq_tm if payment.rq_tm else datetime.now()
         )
         sum_paid = Decimal(str(payment.order_sum))
         uid = payment.uid
         comment = payment.order_id
-        
-        # Запрос с проверкой на дубли
+
         query = text("""
-            INSERT INTO FEE (uid, date_pay, sum_paid, method, comment, ticket_id)
-            SELECT :uid, :date_pay, :sum_paid, 5, :comment, 'SBP'
-            FROM DUAL
-            WHERE NOT EXISTS (
-                SELECT comment FROM FEE 
-                WHERE comment = :comment_check AND uid = :uid_check AND ticket_id = 'SBP'
-            ) LIMIT 1
+            INSERT IGNORE INTO FEE (uid, date_pay, sum_paid, method, comment, ticket_id)
+            VALUES (:uid, :date_pay, :sum_paid, 5, :comment, 'SBP')
         """)
-        
+
         result = await self.db.execute(query, {
             "uid": uid,
             "date_pay": date_pay,
             "sum_paid": sum_paid,
-            "comment": comment,
-            "comment_check": comment,
-            "uid_check": uid
+            "comment": comment
         })
-        
+
         await self.db.commit()
-        
+
         if result.rowcount > 0:
-            return result.lastrowid
+            query_get_id = text("""
+                SELECT fid FROM FEE
+                WHERE uid = :uid AND comment = :comment AND ticket_id = 'SBP'
+                LIMIT 1
+            """)
+            result_id = await self.db.execute(query_get_id, {
+                "uid": uid,
+                "comment": comment
+            })
+            row = result_id.fetchone()
+            return row[0] if row else None
         return None
     
     def _generate_rq_uid(self) -> str:
