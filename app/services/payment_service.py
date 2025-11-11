@@ -2,6 +2,7 @@
 Сервис для работы с платежами
 """
 
+import asyncio
 import hashlib
 import random
 import time
@@ -26,6 +27,8 @@ from app.services.sberbank_service import SberbankService
 from app.services.atol_service import AtolService
 
 logger = structlog.get_logger(__name__)
+
+_payment_processing_locks = {}
 
 
 class PaymentService:
@@ -641,62 +644,64 @@ class PaymentService:
     async def _process_paid_payment(self, payment: PaymentLog) -> None:
         """
         Обработка платежа со статусом PAID (orderStatus = 2)
-        Вставляет платеж в таблицу FEE с атомарной защитой от дубликатов
+        Использует распределённую блокировку для защиты от race conditions
 
         Args:
             payment: Платеж для обработки
         """
-        try:
-            logger.info(
-                "Processing PAID payment",
-                order_id=payment.order_id,
-                sbp_id=payment.sbp_id,
-                amount=payment.order_sum
-            )
+        lock_key = f"payment_process_{payment.uid}_{payment.order_id}"
 
-            fid = await self._insert_to_fee(payment)
+        if lock_key not in _payment_processing_locks:
+            _payment_processing_locks[lock_key] = asyncio.Lock()
 
-            if fid is None:
-                logger.warning(
-                    "Duplicate payment or failed to insert into FEE table",
+        async with _payment_processing_locks[lock_key]:
+            try:
+                logger.info(
+                    "Processing PAID payment",
                     order_id=payment.order_id,
-                    uid=payment.uid
+                    sbp_id=payment.sbp_id,
+                    amount=payment.order_sum
                 )
-                return
-            
-            logger.debug(
-                "Payment inserted into FEE table",
-                order_id=payment.order_id,
-                sbp_id=payment.sbp_id,
-                fid=fid
-            )
-            
-            # Отправка фискального чека
-           # if payment.fiscal_email:
-            await self.atol_service.send_fiscal_receipt(
-                account=payment.account,
-                fid=fid,
-                order_id=payment.order_id,
-                amount=payment.order_sum,
-                email=payment.fiscal_email,
-                phone=payment.fiscal_phone
-            )
-            logger.info("Fiscal receipt sent successfully", order_id=payment.order_id, sbp_id=payment.sbp_id, fid=fid)
-                
-        except Exception as e:
-            logger.error(
-                "Failed to process paid payment",
-                order_id=payment.order_id,
-                sbp_id=payment.sbp_id,
-                error=str(e)
-            )
+
+                fid = await self._insert_to_fee(payment)
+
+                if fid is None:
+                    logger.warning(
+                        "Duplicate payment or failed to insert into FEE table",
+                        order_id=payment.order_id,
+                        uid=payment.uid
+                    )
+                    return
+
+
+                logger.debug(
+                    "Payment inserted into FEE table",
+                    order_id=payment.order_id,
+                    sbp_id=payment.sbp_id,
+                    fid=fid
+                )
+
+                await self.atol_service.send_fiscal_receipt(
+                    account=payment.account,
+                    fid=fid,
+                    order_id=payment.order_id,
+                    amount=payment.order_sum,
+                    email=payment.fiscal_email,
+                    phone=payment.fiscal_phone
+                )
+                logger.info("Fiscal receipt sent successfully", order_id=payment.order_id, sbp_id=payment.sbp_id, fid=fid)
+
+            except Exception as e:
+                logger.error(
+                    "Failed to process paid payment",
+                    order_id=payment.order_id,
+                    sbp_id=payment.sbp_id,
+                    error=str(e)
+                )
     
     async def _insert_to_fee(self, payment: PaymentLog) -> Optional[int]:
         """
-        Вставка записи в таблицу FEE с защитой от дубликатов на уровне БД
-
-        Использует уникальный индекс (uid, comment, ticket_id) для атомарной
-        защиты от race conditions при одновременных платежах.
+        Вставка записи в таблицу FEE с проверкой на дубли
 
         Args:
             payment: Данные платежа
@@ -712,31 +717,28 @@ class PaymentService:
         comment = payment.order_id
 
         query = text("""
-            INSERT IGNORE INTO FEE (uid, date_pay, sum_paid, method, comment, ticket_id)
-            VALUES (:uid, :date_pay, :sum_paid, 5, :comment, 'SBP')
+            INSERT INTO FEE (uid, date_pay, sum_paid, method, comment, ticket_id)
+            SELECT :uid, :date_pay, :sum_paid, 5, :comment, 'SBP'
+            FROM DUAL
+            WHERE NOT EXISTS (
+                SELECT comment FROM FEE
+                WHERE comment = :comment_check AND uid = :uid_check AND ticket_id = 'SBP'
+            ) LIMIT 1
         """)
 
         result = await self.db.execute(query, {
             "uid": uid,
             "date_pay": date_pay,
             "sum_paid": sum_paid,
-            "comment": comment
+            "comment": comment,
+            "comment_check": comment,
+            "uid_check": uid
         })
 
         await self.db.commit()
 
         if result.rowcount > 0:
-            query_get_id = text("""
-                SELECT fid FROM FEE
-                WHERE uid = :uid AND comment = :comment AND ticket_id = 'SBP'
-                LIMIT 1
-            """)
-            result_id = await self.db.execute(query_get_id, {
-                "uid": uid,
-                "comment": comment
-            })
-            row = result_id.fetchone()
-            return row[0] if row else None
+            return result.lastrowid
         return None
     
     def _generate_rq_uid(self) -> str:
