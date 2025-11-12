@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 
 from app.models.payment import PaymentState
 
@@ -64,7 +64,9 @@ class PaymentCreateResponse(BaseModel):
     """
     Схема ответа на создание платежа
     """
-    
+
+    model_config = ConfigDict(use_enum_values=False)
+
     success: bool = Field(..., description="Статус успешности операции")
     sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
@@ -79,7 +81,9 @@ class PaymentStatusResponse(BaseModel):
     """
     Схема ответа на запрос статуса платежа
     """
-    
+
+    model_config = ConfigDict(use_enum_values=False)
+
     success: bool = Field(..., description="Статус успешности операции")
     sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     rq_uid: str = Field(..., description="Уникальный идентификатор запроса")
@@ -95,7 +99,9 @@ class PaymentCancelResponse(BaseModel):
     """
     Схема ответа на отмену платежа
     """
-    
+
+    model_config = ConfigDict(use_enum_values=False)
+
     success: bool = Field(..., description="Статус успешности операции")
     sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     order_id: str = Field(..., description="ID заказа в Сбербанке")
@@ -119,7 +125,9 @@ class PaymentRefundResponse(BaseModel):
     """
     Схема ответа на возврат платежа
     """
-    
+
+    model_config = ConfigDict(use_enum_values=False)
+
     success: bool = Field(..., description="Статус успешности операции")
     sbp_id: int = Field(..., description="ID записи в таблице PAY_SBP_LOG2")
     order_id: str = Field(..., description="ID заказа в Сбербанке")
