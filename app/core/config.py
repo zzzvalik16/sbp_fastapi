@@ -32,11 +32,6 @@ class Settings(BaseSettings):
     DB_USER: str = Field(..., description="Пользователь базы данных")
     DB_PASSWORD: str = Field(..., description="Пароль базы данных")
     DB_NAME: str = Field(..., description="Имя базы данных")
-
-    REDIS_HOST: str = Field(..., description="Хост базы данных редис")
-    REDIS_PORT: int = Field(default=6379, description="Порт базы данных редис")
-    REDIS_DB: str = Field(..., description="БД редис")
-    REDIS_LOCK_TTL: int = Field(..., description="В секундах")
     
     # Сбербанк API    
     TEST_MODE: bool = Field(default=True, description="Режим работы тестовый иди продакшн")
