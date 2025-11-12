@@ -649,6 +649,16 @@ class PaymentService:
         Args:
             payment: Платеж для обработки
         """
+        existing_fee = await self._check_fee_duplicate(payment.order_id, payment.uid)
+        if existing_fee:
+            logger.warning(
+                "Duplicate payment found in FEE table, skipping fiscal receipt",
+                order_id=payment.order_id,
+                uid=payment.uid,
+                existing_fid=existing_fee
+            )
+            return
+
         lock_key = f"payment_process_{payment.uid}_{payment.order_id}"
 
         if lock_key not in _payment_processing_locks:
@@ -672,7 +682,6 @@ class PaymentService:
                         uid=payment.uid
                     )
                     return
-
 
                 logger.debug(
                     "Payment inserted into FEE table",
@@ -698,6 +707,31 @@ class PaymentService:
                     sbp_id=payment.sbp_id,
                     error=str(e)
                 )
+
+    async def _check_fee_duplicate(self, order_id: str, uid: int) -> Optional[int]:
+        """
+        Проверка наличия дубля платежа в таблице FEE
+
+        Args:
+            order_id: ID заказа в Сбербанке
+            uid: ID пользователя
+
+        Returns:
+            Optional[int]: fid существующей записи или None если дубля нет
+        """
+        query = text("""
+            SELECT fid FROM FEE
+            WHERE comment = :order_id AND uid = :uid AND ticket_id = 'SBP'
+            LIMIT 1
+        """)
+
+        result = await self.db.execute(query, {
+            "order_id": order_id,
+            "uid": uid
+        })
+
+        row = result.fetchone()
+        return row[0] if row else None
     
     async def _insert_to_fee(self, payment: PaymentLog) -> Optional[int]:
         """
