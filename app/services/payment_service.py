@@ -253,12 +253,12 @@ class PaymentService:
                                 sberbank_status["depositedDate"] / 1000
                             )
                         
-                        #await self._update_payment_by_id(payment.sbp_id, update_data)
+                        await self._update_payment_by_id(payment.sbp_id, update_data)
                         payment.order_state = new_status
                         
                         # Обработка статуса PAID (orderStatus = 2)
-                        #if new_status == PaymentState.PAID:
-                            #await self._process_paid_payment(payment)
+                        if new_status == PaymentState.PAID:
+                            await self._process_paid_payment(payment)
                             
             except Exception as e:
                 logger.warning(
@@ -749,7 +749,8 @@ class PaymentService:
         sum_paid = Decimal(str(payment.order_sum))
         uid = payment.uid
         comment = payment.order_id
-
+        
+        # Запрос с проверкой на дубли
         query = text("""
             INSERT INTO FEE (uid, date_pay, sum_paid, method, comment, ticket_id)
             SELECT :uid, :date_pay, :sum_paid, 5, :comment, 'SBP'

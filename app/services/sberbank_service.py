@@ -31,7 +31,7 @@ class SberbankService:
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
         
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=50.0,
             verify=False
         )
     
@@ -124,35 +124,40 @@ class SberbankService:
 
         except SberbankAPIException:
             raise
-        except httpx.Timeout as e:
+
+        except httpx.Timeout as e: # Специфично ловим таймаут
             logger.error(
                 "Timeout creating QR code",
                 order_number=order_number,
                 error=f"Request timed out after {e.request.timeout} seconds. {str(e)}"
             )
             raise SberbankAPIException(f"Request timed out: {str(e)}")
-        except httpx.HTTPStatusError as e:
+
+        except httpx.HTTPStatusError as e: # Конкретнее ловим статусные ошибки (4xx, 5xx)
             logger.error(
                 "HTTP status error creating QR code",
                 order_number=order_number,
                 error=f"Status Code: {e.response.status_code}, Response: {e.response.text}"
             )
             raise SberbankAPIException(f"HTTP status error: {e.response.status_code}")
-        except httpx.RequestError as e:
+
+        except httpx.RequestError as e: # Ловим ошибки запроса (сеть, DNS, таймаут)
             logger.error(
                 "Request error creating QR code",
                 order_number=order_number,
                 error=str(e)
             )
             raise SberbankAPIException(f"Request error: {str(e)}")
-        except json.JSONDecodeError as e:
+
+        except json.JSONDecodeError as e: # Ловим ошибки парсинга JSON
             logger.error(
                 "JSON decode error creating QR code",
                 order_number=order_number,
                 error=f"Could not decode JSON response: {str(e)}"
             )
             raise SberbankAPIException(f"Invalid JSON response")
-        except Exception as e:
+
+        except Exception as e: # Ловим все остальные неожиданные ошибки
             logger.error(
                 "Unexpected error creating QR code",
                 order_number=order_number,
