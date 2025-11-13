@@ -29,6 +29,7 @@ from app.services.atol_service import AtolService
 logger = structlog.get_logger(__name__)
 
 _payment_processing_locks = {}
+_payment_order_locks = {}
 
 
 class PaymentService:
@@ -216,76 +217,81 @@ class PaymentService:
     async def get_payment_status(self, order_id: str) -> PaymentStatusResponse:
         """
         Получение статуса платежа
-        
+
         Args:
             order_id: ID заказа в Сбербанке
-            
+
         Returns:
             PaymentStatusResponse: Статус платежа
-            
+
         Raises:
             PaymentException: При ошибке получения статуса
         """
-        try:
-            # Поиск платежа в базе данных
-            payment = await self._get_payment_by_order_id(order_id)
-            if not payment:
-                raise PaymentException("Payment not found")
-            
-            # Получение актуального статуса из API Сбербанка
-            try:
-                sberbank_status = await self.sberbank_service.get_payment_status(order_id)
-                
-                if sberbank_status.get("errorCode") == "0":
-                    new_status = self._map_sberbank_status(
-                        sberbank_status.get("orderStatus", 0)
-                    )
-                    update_data = {                           
-                        "error_code": None,
-                        "error_description": None
-                    }
-                    await self._update_payment_by_id(payment.sbp_id, update_data)
+        order_lock_key = f"order_{order_id}"
+        if order_lock_key not in _payment_order_locks:
+            _payment_order_locks[order_lock_key] = asyncio.Lock()
 
-                    # Обновление статуса в базе, если он изменился
-                    if payment.order_state != new_status:
-                        update_data["order_state"] = new_status
-                        
-                        if sberbank_status.get("depositedDate"):
-                            update_data["operation_date_time"] = datetime.fromtimestamp(
-                                sberbank_status["depositedDate"] / 1000
-                            )
-                        
+        async with _payment_order_locks[order_lock_key]:
+            try:
+                # Поиск платежа в базе данных
+                payment = await self._get_payment_by_order_id(order_id)
+                if not payment:
+                    raise PaymentException("Payment not found")
+
+                # Получение актуального статуса из API Сбербанка
+                try:
+                    sberbank_status = await self.sberbank_service.get_payment_status(order_id)
+
+                    if sberbank_status.get("errorCode") == "0":
+                        new_status = self._map_sberbank_status(
+                            sberbank_status.get("orderStatus", 0)
+                        )
+                        update_data = {
+                            "error_code": None,
+                            "error_description": None
+                        }
                         await self._update_payment_by_id(payment.sbp_id, update_data)
-                        payment.order_state = new_status
-                        
-                        # Обработка статуса PAID (orderStatus = 2)
-                        if new_status == PaymentState.PAID:
-                            await self._process_paid_payment(payment)
-                            
-            except Exception as e:
-                logger.warning(
-                    "Failed to get status from Sberbank API",
-                    order_id=order_id,
-                    error=str(e)
+
+                        # Обновление статуса в базе, если он изменился
+                        if payment.order_state != new_status:
+                            update_data["order_state"] = new_status
+
+                            if sberbank_status.get("depositedDate"):
+                                update_data["operation_date_time"] = datetime.fromtimestamp(
+                                    sberbank_status["depositedDate"] / 1000
+                                )
+
+                            await self._update_payment_by_id(payment.sbp_id, update_data)
+                            payment.order_state = new_status
+
+                            # Обработка статуса PAID (orderStatus = 2)
+                            if new_status == PaymentState.PAID:
+                                await self._process_paid_payment(payment)
+
+                except Exception as e:
+                    logger.warning(
+                        "Failed to get status from Sberbank API",
+                        order_id=order_id,
+                        error=str(e)
+                    )
+
+                return PaymentStatusResponse(
+                    success=True,
+                    sbp_id=payment.sbp_id,
+                    rq_uid=payment.rq_uid,
+                    order_id=payment.order_id,
+                    status=payment.order_state,
+                    amount=Decimal(str(payment.order_sum)) if payment.order_sum else None,
+                    account=payment.account,
+                    created_at=payment.order_create_date,
+                    operation_time=payment.operation_date_time
                 )
-            
-            return PaymentStatusResponse(
-                success=True,
-                sbp_id=payment.sbp_id,
-                rq_uid=payment.rq_uid,
-                order_id=payment.order_id,
-                status=payment.order_state,
-                amount=Decimal(str(payment.order_sum)) if payment.order_sum else None,
-                account=payment.account,
-                created_at=payment.order_create_date,
-                operation_time=payment.operation_date_time
-            )
-            
-        except PaymentException:
-            raise
-        except Exception as e:
-            logger.error("Failed to get payment status", order_id=order_id, error=str(e))
-            raise PaymentException(f"Failed to get payment status: {str(e)}")
+
+            except PaymentException:
+                raise
+            except Exception as e:
+                logger.error("Failed to get payment status", order_id=order_id, error=str(e))
+                raise PaymentException(f"Failed to get payment status: {str(e)}")
     
     async def cancel_payment(self, order_id: str) -> PaymentCancelResponse:
         """
@@ -448,7 +454,7 @@ class PaymentService:
     ) -> None:
         """
         Обработка callback уведомления о платеже
-        
+
         Args:
             md_order: UUID заказа в Платёжном шлюзе
             order_number: Номер заказа в системе Партнера (sbp_id)
@@ -456,127 +462,130 @@ class PaymentService:
             status: Статус операции callback (0 - неуспешно, 1 - успешно)
             additional_params: Дополнительные параметры
         """
-        try:
-            logger.debug(
-                "Processing callback payment",
-                operation=operation,
-                order_id=order_id,
-                order_number=order_number,                
-                status=status,
-                additional_params=additional_params
-            )
-            
-            # Сначала ищем платеж по order_id (mdOrder)
-            payment = None
-            if order_id:
-                payment = await self._get_payment_by_order_id(order_id)
-            
-            # Если не найден, пробуем найти по sbp_id (orderNumber)
-            if not payment:
-                try:
-                    sbp_id = int(order_number)
-                    payment = await self._get_payment_by_id(sbp_id)
-                    logger.info(
-                        "Payment found by sbp_id callback",
-                        sbp_id=sbp_id,
-                        order_id=order_id
-                    )
-                except ValueError:
-                    logger.warning(
-                        "Invalid orderNumber format",
-                        order_number=order_number
-                    )
-                
-                if not payment:
-                    logger.warning(
-                        "Payment not found for callback",
-                        order_id=order_id,
-                        order_number=order_number
-                    )
-                    return
-            
-            # Проверяем успешность операции callback
-            if status != 1:
-                logger.warning(
-                    "Callback operation failed",
+        order_lock_key = f"order_{order_id}"
+        if order_lock_key not in _payment_order_locks:
+            _payment_order_locks[order_lock_key] = asyncio.Lock()
+
+        async with _payment_order_locks[order_lock_key]:
+            try:
+                logger.debug(
+                    "Processing callback payment",
+                    operation=operation,
                     order_id=order_id,
                     order_number=order_number,
-                    operation=operation,
-                    callback_status=status
+                    status=status,
+                    additional_params=additional_params
                 )
-                
-                # Обновляем статус на DECLINED при неуспешном callback
+
+                # Сначала ищем платеж по order_id (mdOrder)
+                payment = None
+                if order_id:
+                    payment = await self._get_payment_by_order_id(order_id)
+
+                # Если не найден, пробуем найти по sbp_id (orderNumber)
+                if not payment:
+                    try:
+                        sbp_id = int(order_number)
+                        payment = await self._get_payment_by_id(sbp_id)
+                        logger.info(
+                            "Payment found by sbp_id callback",
+                            sbp_id=sbp_id,
+                            order_id=order_id
+                        )
+                    except ValueError:
+                        logger.warning(
+                            "Invalid orderNumber format",
+                            order_number=order_number
+                        )
+
+                    if not payment:
+                        logger.warning(
+                            "Payment not found for callback",
+                            order_id=order_id,
+                            order_number=order_number
+                        )
+                        return
+
+                # Проверяем успешность операции callback
+                if status != 1:
+                    logger.warning(
+                        "Callback operation failed",
+                        order_id=order_id,
+                        order_number=order_number,
+                        operation=operation,
+                        callback_status=status
+                    )
+
+                    await self._update_payment_by_id(
+                        payment.sbp_id,
+                        {
+                            "error_description": f"Callback failed with status {status}",
+                            "operation_date_time": datetime.now()
+                        }
+                    )
+                    return
+
+                # Определяем новый статус на основе типа операции
+                new_status = self._map_operation_to_status(operation)
+
+                logger.debug(
+                    "Mapped payment status from operation callback",
+                    operation=operation,
+                    order_id=order_id,
+                    order_number=order_number,
+                    sbp_id=payment.sbp_id,
+                    old_status=payment.order_state,
+                    new_status=new_status
+                )
+
+                # Обновление статуса в базе
                 await self._update_payment_by_id(
                     payment.sbp_id,
                     {
-                       # "order_state": PaymentState.DECLINED,
-                        "error_description": f"Callback failed with status {status}",
+                        "order_state": new_status,
                         "operation_date_time": datetime.now()
                     }
                 )
-                return
-            
-            # Определяем новый статус на основе типа операции
-            new_status = self._map_operation_to_status(operation)
-            
-            logger.debug(
-                "Mapped payment status from operation callback",
-                operation=operation,
-                order_id=order_id,
-                order_number=order_number,
-                sbp_id=payment.sbp_id,
-                old_status=payment.order_state,
-                new_status=new_status                
-            )
-            
-            # Обновление статуса в базе
-            await self._update_payment_by_id(
-                payment.sbp_id,
-                {
-                    "order_state": new_status,
-                    "operation_date_time": datetime.now()
-                }
-            )
-            
-            # Обработка операции "deposited" (завершение платежа)
-            if operation == "deposited" and new_status == PaymentState.PAID:
-                logger.info(
-                    "Processing PAID status from callback",
+
+                # Обработка операции "deposited" (завершение платежа)
+                if operation == "deposited" and new_status == PaymentState.PAID:
+                    logger.info(
+                        "Processing PAID status from callback",
+                        operation=operation,
+                        order_id=order_id,
+                        order_number=order_number,
+                        sbp_id=payment.sbp_id
+                    )
+
+                    # Обновляем данные платежа для актуальной информации
+                    updated_payment = await self._get_payment_by_order_id(order_id)
+                    if updated_payment:
+                        await self._process_paid_payment(updated_payment)
+                    else:
+                        logger.error(
+                            "Failed to get updated payment data callback",
+                            sbp_id=payment.sbp_id
+                        )
+
+                logger.debug(
+                    "Callback payment processed",
                     operation=operation,
                     order_id=order_id,
                     order_number=order_number,
-                    sbp_id=payment.sbp_id                    
+                    sbp_id=payment.sbp_id,
+                    callback_status=status
                 )
-                
-                # Обновляем данные платежа для актуальной информации
-                updated_payment = await  self._get_payment_by_order_id(order_id)
-                if updated_payment:
-                    await self._process_paid_payment(updated_payment)
-                else:
-                    logger.error(
-                        "Failed to get updated payment data callback",
-                        sbp_id=payment.sbp_id
-                    )
-            
-            logger.debug(
-                "Callback payment processed",
-                operation=operation,
-                order_id=order_id,
-                order_number=order_number,
-                sbp_id=payment.sbp_id,
-                callback_status=status
-            )
-            
-        except Exception as e:
-            logger.error(
-                "Failed to process callback payment",
-                operation=operation,
-                order_id=order_id,
-                order_number=order_number,                
-                status=status,
-                error=str(e),
-                exc_info=True
-            )
+
+            except Exception as e:
+                logger.error(
+                    "Failed to process callback payment",
+                    operation=operation,
+                    order_id=order_id,
+                    order_number=order_number,
+                    status=status,
+                    error=str(e),
+                    exc_info=True
+                )
     
     async def _create_payment_log(self, payment_data: dict) -> PaymentLog:
         """
@@ -651,16 +660,6 @@ class PaymentService:
         Args:
             payment: Платеж для обработки
         """
-        existing_fee = await self._check_fee_duplicate(payment.order_id, payment.uid)
-        if existing_fee:
-            logger.warning(
-                "Duplicate payment found in FEE table, skipping fiscal receipt",
-                order_id=payment.order_id,
-                uid=payment.uid,
-                existing_fid=existing_fee
-            )
-            return
-
         lock_key = f"payment_process_{payment.uid}_{payment.order_id}"
 
         if lock_key not in _payment_processing_locks:
@@ -668,6 +667,16 @@ class PaymentService:
 
         async with _payment_processing_locks[lock_key]:
             try:
+                existing_fee = await self._check_fee_duplicate(payment.order_id, payment.uid)
+                if existing_fee:
+                    logger.warning(
+                        "Duplicate payment found in FEE table, skipping fiscal receipt",
+                        order_id=payment.order_id,
+                        uid=payment.uid,
+                        existing_fid=existing_fee
+                    )
+                    return
+
                 logger.info(
                     "Processing PAID payment",
                     order_id=payment.order_id,
