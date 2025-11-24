@@ -14,7 +14,7 @@ import structlog
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import PaymentException, ValidationException
+from app.core.exceptions import PaymentException
 from app.models.payment import PaymentLog, Fee, PaymentState
 from app.schemas.payment import (
     PaymentCreateRequest,

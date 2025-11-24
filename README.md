@@ -4,12 +4,12 @@
 
 ## Технические характеристики
 
-- **Python**: 3.12
-- **FastAPI**: Последняя версия с полной поддержкой async/await
-- **SQLAlchemy**: 2.0+ с асинхронной поддержкой
-- **База данных**: MySQL 5.7
-- **Валидация**: Pydantic v2 с полной типизацией
-- **Логирование**: Структурированное логирование через structlog
+- **Python**: 3.12+
+- **FastAPI**: 0.115.6 с полной поддержкой async/await
+- **SQLAlchemy**: 2.0.36 с асинхронной поддержкой
+- **База данных**: MySQL 5.7/8.0
+- **Валидация**: Pydantic 2.10.5 с полной типизацией
+- **Логирование**: structlog 24.4.0 со структурированным выводом
 - **Контейнеризация**: Docker + docker-compose
 
 ## Архитектура проекта
@@ -50,7 +50,7 @@ docker/                     # Docker конфигурация
 - Создание динамических QR-кодов СБП
 - Получение статуса платежей в реальном времени
 - Отмена и возврат платежей
-- Обработка webhook уведомлений
+- Обработка callback уведомлений
 
 ### ✅ Автоматическая фискализация
 - Интеграция с АТОЛ для отправки фискальных чеков
@@ -164,9 +164,6 @@ make down
 ```bash
 # Запуск в режиме разработки с автоперезагрузкой
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Или через make команду
-make dev
 ```
 
 ## Доступные сервисы
@@ -245,18 +242,18 @@ Content-Type: application/json
 }
 ```
 
-### Webhook уведомления
+### Callback уведомления
 
 ```http
 POST /api/v1/callback
 Content-Type: application/json
-X-Signature: webhook_signature
 
 {
-    "order_id": "a67b0ced-c9a4-4cfb-bce3-b9595afaafc1",
-    "status": 2,
-    "error_code": null,
-    "error_message": null
+    "mdOrder": "a67b0ced-c9a4-4cfb-bce3-b9595afaafc1",
+    "orderNumber": "123456",
+    "operation": "deposited",
+    "status": 1,
+    "additionalParams": {}
 }
 ```
 
@@ -303,16 +300,7 @@ make clean         # Очистить данные
 pip install -r requirements.txt
 
 # Запуск в режиме разработки
-make dev
-# или
-uvicorn app.main:app --reload
-```
-
-### Проверка кода
-
-```bash
-make lint          # Проверка кода
-make format        # Форматирование
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Фискализация АТОЛ

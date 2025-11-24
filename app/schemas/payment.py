@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.payment import PaymentState
 
