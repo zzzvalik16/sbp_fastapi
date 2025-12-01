@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import random
 import time
+import traceback
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
@@ -210,9 +211,16 @@ class PaymentService:
                 source_payments=repr(request.paymentStat)
             )
             
+        except PaymentException:
+            raise
         except Exception as e:
-            logger.error("Failed to create payment", error=str(e))
-            raise PaymentException(f"Failed to create payment: {str(e)}")
+            logger.error(
+                "Failed to create payment",
+                error_type=type(e).__name__,
+                error=str(e),
+                traceback=traceback.format_exc()
+            )
+            raise PaymentException(f"Failed to create payment: {type(e).__name__}")
     
     async def get_payment_status(self, order_id: str) -> PaymentStatusResponse:
         """

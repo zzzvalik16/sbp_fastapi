@@ -131,46 +131,49 @@ class SberbankService:
         except SberbankAPIException:
             raise
 
-        except httpx.Timeout as e: # Специфично ловим таймаут
+        except httpx.TimeoutException as e:
             logger.error(
                 "Timeout creating QR code",
                 order_number=order_number,
-                error=f"Request timed out after {e.request.timeout} seconds. {str(e)}"
+                error=f"Request timed out: {str(e)}"
             )
-            raise SberbankAPIException(f"Request timed out: {str(e)}")
+            raise SberbankAPIException(f"Request timed out after 50 seconds")
 
-        except httpx.HTTPStatusError as e: # Конкретнее ловим статусные ошибки (4xx, 5xx)
+        except httpx.HTTPStatusError as e:
             logger.error(
                 "HTTP status error creating QR code",
                 order_number=order_number,
-                error=f"Status Code: {e.response.status_code}, Response: {e.response.text}"
+                status_code=e.response.status_code,
+                error=str(e)
             )
-            raise SberbankAPIException(f"HTTP status error: {e.response.status_code}")
+            raise SberbankAPIException(f"HTTP error {e.response.status_code}: {e.response.text[:200]}")
 
-        except httpx.RequestError as e: # Ловим ошибки запроса (сеть, DNS, таймаут)
+        except httpx.RequestError as e:
             logger.error(
                 "Request error creating QR code",
                 order_number=order_number,
+                error_type=type(e).__name__,
                 error=str(e)
             )
-            raise SberbankAPIException(f"Request error: {str(e)}")
+            raise SberbankAPIException(f"Network error: {type(e).__name__}")
 
-        except json.JSONDecodeError as e: # Ловим ошибки парсинга JSON
+        except json.JSONDecodeError as e:
             logger.error(
                 "JSON decode error creating QR code",
                 order_number=order_number,
-                error=f"Could not decode JSON response: {str(e)}"
+                error=str(e)
             )
-            raise SberbankAPIException(f"Invalid JSON response")
+            raise SberbankAPIException(f"Invalid JSON response from Sberbank")
 
-        except Exception as e: # Ловим все остальные неожиданные ошибки
+        except BaseException as e:
             logger.error(
                 "Unexpected error creating QR code",
                 order_number=order_number,
+                error_type=type(e).__name__,
                 error=str(e),
                 traceback=traceback.format_exc()
             )
-            raise SberbankAPIException(f"An unexpected error occurred: {str(e)}")       
+            raise SberbankAPIException(f"Unexpected error: {type(e).__name__}")       
 
     async def get_payment_status(self, order_id: str) -> Dict[str, Any]:
         """
@@ -195,39 +198,47 @@ class SberbankService:
         
         try:
             logger.info("Getting payment status", order_id=order_id, url=url)
-            
+
             response = await self.client.post(url, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
-            # Фильтрация null значений из ответа
+
             result = self._filter_null_values(result)
-            
-            logger.debug(
-                "Payment status retrieved",
-                order_id=order_id,
-                result=result
-                #order_status=result.get("orderStatus"),
-                #error_code=result.get("errorCode")                
-            )
-            
+
+            logger.debug("Payment status retrieved", order_id=order_id)
+
             return result
-            
-        except httpx.HTTPError as e:
+
+        except httpx.TimeoutException as e:
             logger.error(
-                "HTTP error getting payment status",
+                "Timeout getting payment status",
                 order_id=order_id,
                 error=str(e)
             )
-            raise SberbankAPIException(f"HTTP error: {str(e)}")
+            raise SberbankAPIException(f"Request timed out after 50 seconds")
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "HTTP status error getting payment status",
+                order_id=order_id,
+                status_code=e.response.status_code
+            )
+            raise SberbankAPIException(f"HTTP error {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(
+                "Network error getting payment status",
+                order_id=order_id,
+                error_type=type(e).__name__
+            )
+            raise SberbankAPIException(f"Network error: {type(e).__name__}")
         except Exception as e:
             logger.error(
                 "Unexpected error getting payment status",
                 order_id=order_id,
+                error_type=type(e).__name__,
                 error=str(e)
             )
-            raise SberbankAPIException(f"Unexpected error: {str(e)}")
+            raise SberbankAPIException(f"Unexpected error: {type(e).__name__}")
     
     async def cancel_payment(self, order_id: str) -> Dict[str, Any]:
         """
@@ -252,37 +263,41 @@ class SberbankService:
         
         try:
             logger.debug("Cancelling payment", order_id=order_id, url=url)
-            
+
             response = await self.client.post(url, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
-            # Фильтрация null значений из ответа
             result = self._filter_null_values(result)
-            
-            logger.info(
-                "Payment cancelled",
-                order_id=order_id,
-                error_code=result.get("errorCode")
-            )
-            
+
+            logger.info("Payment cancelled", order_id=order_id)
+
             return result
-            
-        except httpx.HTTPError as e:
+
+        except httpx.TimeoutException as e:
+            logger.error("Timeout cancelling payment", order_id=order_id)
+            raise SberbankAPIException(f"Request timed out after 50 seconds")
+        except httpx.HTTPStatusError as e:
             logger.error(
-                "HTTP error cancelling payment",
+                "HTTP status error cancelling payment",
                 order_id=order_id,
-                error=str(e)
+                status_code=e.response.status_code
             )
-            raise SberbankAPIException(f"HTTP error: {str(e)}")
+            raise SberbankAPIException(f"HTTP error {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(
+                "Network error cancelling payment",
+                order_id=order_id,
+                error_type=type(e).__name__
+            )
+            raise SberbankAPIException(f"Network error: {type(e).__name__}")
         except Exception as e:
             logger.error(
                 "Unexpected error cancelling payment",
                 order_id=order_id,
-                error=str(e)
+                error_type=type(e).__name__
             )
-            raise SberbankAPIException(f"Unexpected error: {str(e)}")
+            raise SberbankAPIException(f"Unexpected error: {type(e).__name__}")
     
     async def refund_payment(self, order_id: str, amount: int) -> Dict[str, Any]:
         """
@@ -308,45 +323,42 @@ class SberbankService:
         }
         
         try:
-            logger.debug(
-                "Refunding payment",
-                order_id=order_id,
-                amount=amount,
-                url=url
-            )
-            
+            logger.debug("Refunding payment", order_id=order_id, amount=amount)
+
             response = await self.client.post(url, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
-            # Фильтрация null значений из ответа
             result = self._filter_null_values(result)
-            
-            logger.info(
-                "Payment refunded",
-                order_id=order_id,
-                amount=amount,
-                #result=result,
-                error_code=result.get("errorCode")
-            )
-            
+
+            logger.info("Payment refunded", order_id=order_id, amount=amount)
+
             return result
-            
-        except httpx.HTTPError as e:
+
+        except httpx.TimeoutException as e:
+            logger.error("Timeout refunding payment", order_id=order_id)
+            raise SberbankAPIException(f"Request timed out after 50 seconds")
+        except httpx.HTTPStatusError as e:
             logger.error(
-                "HTTP error refunding payment",
+                "HTTP status error refunding payment",
                 order_id=order_id,
-                error=str(e)
+                status_code=e.response.status_code
             )
-            raise SberbankAPIException(f"HTTP error: {str(e)}")
+            raise SberbankAPIException(f"HTTP error {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(
+                "Network error refunding payment",
+                order_id=order_id,
+                error_type=type(e).__name__
+            )
+            raise SberbankAPIException(f"Network error: {type(e).__name__}")
         except Exception as e:
             logger.error(
                 "Unexpected error refunding payment",
                 order_id=order_id,
-                error=str(e)
+                error_type=type(e).__name__
             )
-            raise SberbankAPIException(f"Unexpected error: {str(e)}")
+            raise SberbankAPIException(f"Unexpected error: {type(e).__name__}")
     
     def _filter_null_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
