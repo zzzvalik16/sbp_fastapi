@@ -7,7 +7,7 @@ from typing import Annotated, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 import structlog
 
-from app.api.dependencies import get_payment_service_safe
+from app.api.dependencies import get_payment_service_safe, verify_callback_ip
 from app.core.config import get_settings
 from app.schemas.payment import CallbackPaymentData
 from app.services.payment_service import PaymentService
@@ -25,7 +25,7 @@ logger = structlog.get_logger(__name__)
 async def handle_payment_callback(
     callback_data: CallbackPaymentData,
     payment_service: Annotated[PaymentService, Depends(get_payment_service_safe)],
-    request: Request
+    request: Annotated[Request, Depends(verify_callback_ip)]
 ) -> dict[str, str]:
     """
     Обработка callback уведомления о платеже
