@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=True, description="Режим отладки")
     LOG_LEVEL: str = Field(default="INFO", description="Уровень логирования")
     ALLOWED_ORIGINS: List[str] = Field(default=["*"], description="Разрешенные CORS origins")
+    ALLOWED_CALLBACK_IPS: List[str] = Field(default=["*"], description="Разрешенные адреса для callback запросов")
     
     # База данных
     DB_HOST: str = Field(..., description="Хост базы данных")
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     DB_NAME: str = Field(..., description="Имя базы данных")
     
     # Сбербанк API    
-    TEST_MODE: bool = Field(default=True, description="Режим работы тестовый иди продакшн")
+    TEST_MODE: bool = Field(default=False, description="Режим работы тестовый иди продакшн")
     SBERBANK_TEST_URL: str = Field(
         default="https://ecomift.sberbank.ru/ecomm/gw/partner/api/v1",
         description="Тестовый URL API СБП Сбербанка"

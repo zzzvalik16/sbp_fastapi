@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(api_v1_router, prefix="/api/v1")
     app.include_router(api_v2_router, prefix="/api/v2")
     
-    @app.get("/health")
+    @app.get("/hhealthh")
     async def health_check() -> dict[str, str]:
         """Проверка состояния API"""
         return {"status": "healthy", "version": "1.0.0"}
