@@ -32,7 +32,7 @@ class SberbankService:
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
 
         self.client = httpx.AsyncClient(
-            timeout=50.0,
+            timeout=30.0,
             verify=False,
             http2=False
         )
@@ -154,7 +154,7 @@ class SberbankService:
         Raises:
             SberbankAPIException: При ошибке API Сбербанка
         """
-        timeout_value = 86400
+        timeout_value = 1800
         if source_payments == "sbpClient":
             timeout_value = self.qr_timeout_secs
 

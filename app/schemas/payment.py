@@ -146,8 +146,7 @@ class CallbackPaymentData(BaseModel):
     - operation: Тип операции (например: deposited, approved, reversed)
     - status: Статус операции (0-10)
 
-    Необязательные поля:
-    - checksum: Контрольная сумма для проверки подлинности
+    Необязательные поля:    
     - additionalParams: Дополнительные параметры от платежной системы
     """
 
@@ -174,12 +173,7 @@ class CallbackPaymentData(BaseModel):
         ge=0,
         le=10,
         description="Статус операции callback: 0-неуспешно, 1-успешно (обязательно)"
-    )
-    checksum: Optional[str] = Field(
-        default=None,
-        max_length=256,
-        description="Контрольная сумма для проверки подлинности (необязательно)"
-    )
+    )    
     additionalParams: Optional[dict] = Field(
         default=None,
         description="Дополнительные параметры от платежной системы (необязательно)"
