@@ -30,6 +30,7 @@ class SberbankService:
         self.return_url = self.settings.SBERBANK_RETURN_URL
         self.return_fail_url = self.settings.SBERBANK_FAIL_RETURN_URL
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
+        #self.callback_url = self.settings.SBERBANK_CALLBACK_URL
 
         self.client = httpx.AsyncClient(
             timeout=30.0,
@@ -170,6 +171,7 @@ class SberbankService:
             "amount": amount,
             "returnUrl": self.return_url,
             "failUrl": self.return_fail_url,
+            #"dynamicCallbackUrl": self.callback_url,
             "description": description,
             "sessionTimeoutSecs": timeout_value,
             "jsonParams": json_dop_params
