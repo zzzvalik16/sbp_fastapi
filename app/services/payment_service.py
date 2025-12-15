@@ -118,17 +118,49 @@ class PaymentService:
                 )
             
             # Создание QR кода через API Сбербанка
-            sberbank_response = await self.sberbank_service.create_qr_code(
-                order_number=str(payment.sbp_id),  # Используем sbp_id как orderNumber
-                amount=int(request.amount * 100),  # Конвертация в копейки
-                description=f"Пополнение лицевого счета №{request.account}",
-                email=str(request.email),
-                source_payments=request.paymentStat
-            )
-            
+            try:
+                sberbank_response = await self.sberbank_service.create_qr_code(
+                    order_number=str(payment.sbp_id),  # Используем sbp_id как orderNumber
+                    amount=int(request.amount * 100),  # Конвертация в копейки
+                    description=f"Пополнение лицевого счета №{request.account}",
+                    email=str(request.email),
+                    source_payments=request.paymentStat
+                )
+            except Exception as e:
+                error_msg = str(e)
+                await self._update_payment_by_id(
+                    payment.sbp_id,
+                    {
+                        "uid": customer_uid,
+                        "error_code": "API_ERROR",
+                        "error_description": error_msg,
+                        "order_state": PaymentState.DECLINED,
+                        "operation_date_time": datetime.now()
+                    }
+                )
+
+                logger.error(
+                    "Failed to create QR code via Sberbank API",
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    error=error_msg,
+                    traceback=traceback.format_exc()
+                )
+
+                return PaymentCreateResponse(
+                    success=False,
+                    sbp_id=payment.sbp_id,
+                    rq_uid=rq_uid,
+                    order_id=None,
+                    qrcode_link="",
+                    qr_url=None,
+                    amount=request.amount,
+                    status=PaymentState.DECLINED
+                )
+
             # Обновление записи с данными от банка
             update_data = {
-                "uid": customer_uid, 
+                "uid": customer_uid,
                 "error_code": sberbank_response.get("errorCode", "0"),
                 "operation_date_time": datetime.now()
             }
