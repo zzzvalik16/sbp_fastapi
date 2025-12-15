@@ -128,11 +128,17 @@ class PaymentService:
                 )
             except Exception as e:
                 error_msg = str(e)
+                error_code = "999"
+
+                if hasattr(e, 'details') and isinstance(e.details, dict):
+                    error_code = str(e.details.get('errorCode', '999'))
+                    error_msg = e.details.get('errorMessage', error_msg)
+
                 await self._update_payment_by_id(
                     payment.sbp_id,
                     {
                         "uid": customer_uid,
-                        "error_code": "API_ERROR",
+                        "error_code": error_code,
                         "error_description": error_msg,
                         "order_state": PaymentState.DECLINED,
                         "operation_date_time": datetime.now()
