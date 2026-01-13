@@ -374,19 +374,21 @@ class SberbankService:
 
     def _filter_null_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Фильтрация null значений из словаря
+        Фильтрация null значений из словаря, но сохраняет важные поля
 
         Args:
             data: Исходный словарь
 
         Returns:
-            Dict[str, Any]: Словарь без null значений
+            Dict[str, Any]: Словарь без null значений (кроме важных полей)
         """
+        important_keys = {'orderId', 'orderNumber', 'errorCode', 'errorMessage'}
+
         if isinstance(data, dict):
             return {
                 key: self._filter_null_values(value)
                 for key, value in data.items()
-                if value is not None
+                if value is not None or key in important_keys
             }
         elif isinstance(data, list):
             return [self._filter_null_values(item) for item in data if item is not None]
