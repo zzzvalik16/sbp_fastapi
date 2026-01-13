@@ -34,7 +34,7 @@ class SberbankService:
 
         self.client = httpx.AsyncClient(
             timeout=30.0,
-            verify=False,
+            verify=True,
             http2=False
         )
         self.max_retries = 3
@@ -225,9 +225,7 @@ class SberbankService:
             logger.error(
                 "Unexpected error creating QR code",
                 order_number=order_number,
-                error_type=type(e).__name__,
-                error=str(e),
-                traceback=traceback.format_exc()
+                error_type=type(e).__name__
             )
             raise SberbankAPIException(f"Unexpected error: {type(e).__name__}")
 

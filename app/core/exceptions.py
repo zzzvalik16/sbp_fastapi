@@ -56,11 +56,11 @@ class ValidationException(SBPAPIException):
 async def sbp_exception_handler(request: Request, exc: SBPAPIException) -> JSONResponse:
     """
     Обработчик исключений СБП API
-    
+
     Args:
         request: HTTP запрос
         exc: Исключение СБП API
-        
+
     Returns:
         JSONResponse: JSON ответ с ошибкой
     """
@@ -68,16 +68,13 @@ async def sbp_exception_handler(request: Request, exc: SBPAPIException) -> JSONR
         "SBP API Exception",
         path=request.url.path,
         method=request.method,
-        error=exc.message,
-        details=exc.details
+        error=exc.message
     )
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "error": exc.message,
-            "details": exc.details,
-            "path": request.url.path
+            "error": exc.message
         }
     )
 
@@ -85,27 +82,24 @@ async def sbp_exception_handler(request: Request, exc: SBPAPIException) -> JSONR
 async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
     """
     Обработчик ошибок валидации Pydantic
-    
+
     Args:
         request: HTTP запрос
         exc: Ошибка валидации
-        
+
     Returns:
         JSONResponse: JSON ответ с ошибкой валидации
     """
     logger.error(
         "Validation Error",
         path=request.url.path,
-        method=request.method,
-        errors=exc.errors()
+        method=request.method
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "error": "Validation failed",
-            "details": {"validation_errors": exc.errors()},
-            "path": request.url.path
+            "error": "Validation failed"
         }
     )
 
@@ -113,11 +107,11 @@ async def validation_exception_handler(request: Request, exc: ValidationError) -
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """
     Обработчик HTTP исключений
-    
+
     Args:
         request: HTTP запрос
         exc: HTTP исключение
-        
+
     Returns:
         JSONResponse: JSON ответ с ошибкой
     """
@@ -125,15 +119,13 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         "HTTP Exception",
         path=request.url.path,
         method=request.method,
-        status_code=exc.status_code,
-        detail=exc.detail
+        status_code=exc.status_code
     )
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "error": exc.detail,
-            "path": request.url.path
+            "error": "Request failed"
         }
     )
 
@@ -141,27 +133,24 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     Общий обработчик исключений
-    
+
     Args:
         request: HTTP запрос
         exc: Исключение
-        
+
     Returns:
         JSONResponse: JSON ответ с ошибкой
     """
     logger.error(
         "Unhandled Exception",
         path=request.url.path,
-        method=request.method,
-        error=str(exc),
-        exc_info=True
+        method=request.method
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "error": "Internal server error",
-            "path": request.url.path
+            "error": "Internal server error"
         }
     )
 

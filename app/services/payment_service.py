@@ -149,8 +149,7 @@ class PaymentService:
                     "Failed to create QR code via Sberbank API",
                     sbp_id=payment.sbp_id,
                     rq_uid=rq_uid,
-                    error=error_msg,
-                    traceback=traceback.format_exc()
+                    error=error_msg
                 )
 
                 return PaymentCreateResponse(
@@ -254,9 +253,7 @@ class PaymentService:
         except Exception as e:
             logger.error(
                 "Failed to create payment",
-                error_type=type(e).__name__,
-                error=str(e),
-                traceback=traceback.format_exc()
+                error_type=type(e).__name__
             )
             raise PaymentException(f"Failed to create payment: {type(e).__name__}")
     
@@ -393,7 +390,7 @@ class PaymentService:
                 }
             )
             
-            logger.info("Payment cancelled successfully", order_id=order_id, result=cancel_result)
+            logger.info("Payment cancelled successfully", order_id=order_id)
             
             return PaymentCancelResponse(
                 success=True,
@@ -458,8 +455,7 @@ class PaymentService:
                     "Failed to refund payment via Sberbank API",
                     order_id=order_id,
                     error_code=error_code,
-                    error_message=error_msg,
-                    result=refund_result
+                    error_message=error_msg
                 )
                 
                 #raise PaymentException(f"Failed to refund payment: {error_msg}")
@@ -628,9 +624,7 @@ class PaymentService:
                     operation=operation,
                     order_id=order_id,
                     order_number=order_number,
-                    status=status,
-                    error=str(e),
-                    exc_info=True
+                    status=status
                 )
     
     async def _create_payment_log(self, payment_data: dict) -> PaymentLog:

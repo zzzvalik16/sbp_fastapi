@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     )
     
     # Приложение
-    DEBUG: bool = Field(default=True, description="Режим отладки")
+    DEBUG: bool = Field(default=False, description="Режим отладки")
     LOG_LEVEL: str = Field(default="INFO", description="Уровень логирования")
-    ALLOWED_ORIGINS: List[str] = Field(default=["*"], description="Разрешенные CORS origins")
-    ALLOWED_CALLBACK_IPS: List[str] = Field(default=["*"], description="Разрешенные адреса для callback запросов")
+    ALLOWED_ORIGINS: List[str] = Field(default=["https://www.starlink.ru"], description="Разрешенные CORS origins")
+    ALLOWED_CALLBACK_IPS: List[str] = Field(default=["185.166.131.134", "185.166.131.135"], description="Разрешенные адреса для callback запросов")
     
     # База данных
     DB_HOST: str = Field(..., description="Хост базы данных")
