@@ -34,7 +34,7 @@ class SberbankService:
 
         self.client = httpx.AsyncClient(
             timeout=30.0,
-            verify=True,
+            verify=self.settings.VERIFY_SSL,
             http2=False
         )
         self.max_retries = 3

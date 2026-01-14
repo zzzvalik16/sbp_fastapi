@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Уровень логирования")
     ALLOWED_ORIGINS: List[str] = Field(default=["https://www.starlink.ru"], description="Разрешенные CORS origins")
     ALLOWED_CALLBACK_IPS: List[str] = Field(default=["185.166.131.134", "185.166.131.135"], description="Разрешенные адреса для callback запросов")
+    VERIFY_SSL: bool = Field(default=True, description="Проверка SSL сертификатов при подключении к API")
     
     # База данных
     DB_HOST: str = Field(..., description="Хост базы данных")

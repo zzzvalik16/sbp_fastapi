@@ -30,7 +30,7 @@ class AtolService:
         
         self.client = httpx.AsyncClient(
             timeout=30.0,
-            verify=True
+            verify=self.settings.VERIFY_SSL
         )
     
     async def send_fiscal_receipt(
