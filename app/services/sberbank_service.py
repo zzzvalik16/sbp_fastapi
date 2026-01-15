@@ -33,9 +33,15 @@ class SberbankService:
         self.qr_timeout_secs = self.settings.SBERBANK_QR_TIMEOUT * 60
         #self.callback_url = self.settings.SBERBANK_CALLBACK_URL
 
+        verify_ssl = self.settings.VERIFY_SSL
+        if verify_ssl:
+            verify = certifi.where()
+        else:
+            verify = False
+
         self.client = httpx.AsyncClient(
             timeout=30.0,
-            verify=certifi.where(),
+            verify=verify,
             http2=False
         )
         self.max_retries = 3
@@ -90,6 +96,15 @@ class SberbankService:
                     await asyncio.sleep(wait_time)
                 else:
                     raise SberbankAPIException(f"Request timed out after {self.max_retries} retries")
+
+            except httpx.SSLError as e:
+                logger.error(
+                    f"{operation_name} SSL error",
+                    error=str(e),
+                    url=url,
+                    verify_ssl=self.settings.VERIFY_SSL
+                )
+                raise SberbankAPIException(f"SSL error: {str(e)}")
 
             except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError) as e:
                 last_error = e
