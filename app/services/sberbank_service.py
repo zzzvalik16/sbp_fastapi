@@ -9,7 +9,6 @@ import httpx
 import structlog
 import traceback
 import json
-import certifi
 
 from app.core.config import get_settings
 from app.core.exceptions import SberbankAPIException
@@ -34,14 +33,10 @@ class SberbankService:
         #self.callback_url = self.settings.SBERBANK_CALLBACK_URL
 
         verify_ssl = self.settings.VERIFY_SSL
-        if verify_ssl:
-            verify = certifi.where()
-        else:
-            verify = False
 
         self.client = httpx.AsyncClient(
             timeout=30.0,
-            verify=verify,
+            verify=verify_ssl,
             http2=False
         )
         self.max_retries = 3
