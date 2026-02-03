@@ -9,55 +9,41 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    depends_on:
-      - mysql
     environment:
-      - DEBUG=true
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_USER=sbp_user
-      - DB_PASSWORD=sbp_password
-      - DB_NAME=sbp_api
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
+      - ALLOWED_CALLBACK_IPS=${ALLOWED_CALLBACK_IPS:-["*"]}
+      - VERIFY_SSL=${VERIFY_SSL:-false}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - TEST_MODE=${TEST_MODE:-true}
+      - SBERBANK_USERNAME=${SBERBANK_USERNAME}
+      - SBERBANK_PASSWORD=${SBERBANK_PASSWORD}
+      - SBERBANK_RETURN_URL=${SBERBANK_RETURN_URL}
+      - SBERBANK_FAIL_RETURN_URL=${SBERBANK_FAIL_RETURN_URL}
+      - SBERBANK_QR_TIMEOUT=${SBERBANK_QR_TIMEOUT:-1440}
+      - ATOL_PAYMENT_ID=${ATOL_PAYMENT_ID:-SBP2}
+      - ATOL_LOGIN=${ATOL_LOGIN}
+      - ATOL_PASSWORD=${ATOL_PASSWORD}
+      - ATOL_URL=${ATOL_URL:-https://atol.starlink.ru/api/v1/atol/register}
+      - CALLBACK_SECRET=${CALLBACK_SECRET}
     volumes:
-      - ./app:/app/app
       - ./logs:/app/logs
+      - ./certs:/app/certs:ro
     networks:
       - sbp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  mysql:
-    image: mysql:5.7
-    container_name: sbp-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: 
-      MYSQL_DATABASE: sbp_api
-      MYSQL_USER: sbp_user
-      MYSQL_PASSWORD: sbp_password
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - sbp-network
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: sbp-phpmyadmin
-    restart: unless-stopped
-    environment:
-      PMA_HOST: mysql
-      PMA_USER: root
-      PMA_PASSWORD: 
-    ports:
-      - "8080:80"
-    depends_on:
-      - mysql
-    networks:
-      - sbp-network
-
-volumes:
-  mysql_data:
+volumes: {}
 
 networks:
   sbp-network:
